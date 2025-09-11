@@ -20,29 +20,27 @@
 
   async function loadHistoryIfNeeded() {
     const historyTab = document.getElementById('history');
-    console.log('🔁 Запущена loadHistoryIfNeeded');
 
-    if (!historyTab.dataset.loaded) {
-      console.log('⏳ Запрашиваем таблицу...');
-      try {
-        const resp = await fetch(WEBAPP_URL + '?history=1');
-        console.log('📡 Запрос выполнен, статус:', resp.status);
+    console.log('📥 Загрузка истории: старт');
 
-        const html = await resp.text();
-        console.log('📄 Ответ:', html.slice(0, 100) + '...'); // покажем первые 100 символов
+    if (historyTab.dataset.loaded === 'true') {
+      console.log('⏩ Уже загружено, пропускаем');
+      return;
+    }
 
-        if (html.trim().length === 0) {
-          historyTab.innerHTML = '<p>⚠️ Порожній результат</p>';
-        } else {
-          historyTab.innerHTML = html;
-          historyTab.dataset.loaded = 'true';
-        }
-      } catch (error) {
-        console.error('❌ Помилка історії:', error);
-        historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
-      }
-    } else {
-      console.log('ℹ️ Історія вже була завантажена');
+    try {
+      const resp = await fetch(WEBAPP_URL + '?history=1');
+      console.log('📡 Ответ от GAS получен:', resp.status);
+
+      const html = await resp.text();
+      console.log('📄 HTML получен:', html.slice(0, 100), '...');
+
+      // Сюда вставим только тело (без id="history")
+      historyTab.innerHTML = html;
+      historyTab.dataset.loaded = 'true';
+    } catch (err) {
+      console.error('❌ Ошибка загрузки истории:', err);
+      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
     }
   }
 
