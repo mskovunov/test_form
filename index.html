@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Передача показників</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+
+  <script>
+    const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby7-ToHy_YNuQ8UxISniVLB9ArQW9cN9pnvMZbAwLlnL4SsGfTKG4JcXYvi_eKhl6ZD/exec';
+
+    async function loadPreviousReading() {
+      try {
+        const resp = await fetch(WEBAPP_URL + '?getLast=1');
+        const val = await resp.text();
+        document.getElementById('prevReading').value = val;
+      } catch (err) {
+        console.error('Помилка при отриманні попереднього показника:', err);
+      }
+    }
+
+    async function loadHistory() {
+      const historyDiv = document.getElementById('history');
+      const button = document.getElementById('historyButton');
+      button.disabled = true;
+      button.innerText = '⏳ Завантаження...';
+
+      try {
+        const resp = await fetch(WEBAPP_URL + '?history=1');
+        const html = await resp.text();
+        historyDiv.innerHTML = html;
+        historyDiv.style.display = 'block';
+        button.style.display = 'none';
+      } catch (err) {
+        historyDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+        console.error('Помилка історії:', err);
+        button.disabled = false;
+        button.innerText = 'Переглянути історію';
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.body.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPreviousReading();
+      if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark');
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+
+    <h2>Форма для передачі показників лічильника</h2>
+
+    <form id="meterForm">
+      <label>Попередній показник:
+        <input type="number" id="prevReading" readonly placeholder="Завантаження...">
+      </label>
+
+      <label>Новий показник:
+        <input type="number" name="reading" required step="0.1" placeholder="Наприклад: 405.5">
+      </label>
+
+      <label>Користувач:
+        <select name="name" required>
+          <option value="" disabled selected>Оберіть користувача</option>
+          <option value="eGolf">eGolf</option>
+          <option value="iONIQ">iONIQ</option>
+          <option value="інше">інше</option>
+        </select>
+      </label>
+
+      <button type="submit">Відправити</button>
+    </form>
+
+    <button id="historyButton" type="button" onclick="loadHistory()">📊 Переглянути історію</button>
+
+    <div id="history" style="display:none;"></div>
+
+    <p id="status"></p>
+  </div>
+
+  <script>
+    const form = document.getElementById("meterForm");
+    const status = document.getElementById("status");
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const win = window.open('', '', 'width=500,height=300');
+      if (win) {
+        win.document.write('<p style="font-family:sans-serif">⏳ Відправка даних...</p>');
+      }
+
+      const data = new URLSearchParams();
+      data.append("name", form.name.value);
+      data.append("reading", form.reading.value);
+
+      let success = false;
+
+      try {
+        await fetch(WEBAPP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: data.toString(),
+        });
+        success = true;
+      } catch (err) {
+        console.error("Помилка при відправці:", err);
+      } finally {
+        status.innerText = success ? "✅ Дані успішно відправлені!" : "⚠️ Дані відправлені з попередженням!";
+        status.classList.remove("success", "error");
+        status.classList.add(success ? "success" : "error");
+        form.reset();
+        status.classList.add("show");
+        setTimeout(() => status.classList.remove("show"), 3000);
+
+        if (win) {
+          win.document.body.innerHTML = `
+            <h2>${success ? "✅ Дані успішно відправлені!" : "⚠️ Дані відправлені з попередженням!"}</h2>
+            <p>Це вікно закриється через 3 секунди...</p>
+          `;
+          setTimeout(() => win.close(), 3000);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
