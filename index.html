@@ -46,14 +46,26 @@
     }
 
     function switchTab(tabId) {
-      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+  console.log('Свитч вкладки:', tabId); // ➤ ДОБАВЛЕНО
 
-      document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
-      document.getElementById(tabId).classList.add('active');
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
 
-      if (tabId === 'history') loadHistoryIfNeeded();
+  const selectedTabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
+  const selectedTabContent = document.getElementById(tabId);
+
+  if (selectedTabBtn && selectedTabContent) {
+    selectedTabBtn.classList.add('active');
+    selectedTabContent.classList.add('active');
+
+    if (tabId === 'history') {
+      console.log('Загрузка истории...'); // ➤ ДОБАВЛЕНО
+      loadHistoryIfNeeded();
     }
+  } else {
+    console.error('❌ Таб с id', tabId, 'не найден');
+  }
+}
 
     window.addEventListener('DOMContentLoaded', () => {
       loadPreviousReading();
