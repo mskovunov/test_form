@@ -19,26 +19,32 @@
     }
 
   async function loadHistoryIfNeeded() {
-  const historyTab = document.getElementById('history');
+    const historyTab = document.getElementById('history');
+    console.log('🔁 Запущена loadHistoryIfNeeded');
 
-  if (!historyTab.dataset.loaded) {
-    try {
-      const response = await fetch(WEBAPP_URL + '?history=1');
-      const html = await response.text();
-      
-      if (html.trim().length === 0) {
-        historyTab.innerHTML = '<p>⚠️ Порожній результат</p>';
-      } else {
-        historyTab.innerHTML = html;
-        historyTab.dataset.loaded = 'true';
+    if (!historyTab.dataset.loaded) {
+      console.log('⏳ Запрашиваем таблицу...');
+      try {
+        const resp = await fetch(WEBAPP_URL + '?history=1');
+        console.log('📡 Запрос выполнен, статус:', resp.status);
+
+        const html = await resp.text();
+        console.log('📄 Ответ:', html.slice(0, 100) + '...'); // покажем первые 100 символов
+
+        if (html.trim().length === 0) {
+          historyTab.innerHTML = '<p>⚠️ Порожній результат</p>';
+        } else {
+          historyTab.innerHTML = html;
+          historyTab.dataset.loaded = 'true';
+        }
+      } catch (error) {
+        console.error('❌ Помилка історії:', error);
+        historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
       }
-
-    } catch (error) {
-      console.error('Помилка історії:', error);
-      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
+    } else {
+      console.log('ℹ️ Історія вже була завантажена');
     }
   }
-}
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
