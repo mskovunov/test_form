@@ -218,3 +218,60 @@ button:hover {
     font-size: 0.85rem;
   }
 }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.menu-toggle {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-right: auto;
+}
+
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  margin: 15px 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: border-color 0.3s;
+}
+
+.tab:hover {
+  border-color: var(--button-hover);
+}
+
+.tab.active {
+  border-color: var(--button-bg);
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
