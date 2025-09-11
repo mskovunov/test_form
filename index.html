@@ -5,7 +5,6 @@
   <title>Передача показників</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
-
   <script>
     const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby7-ToHy_YNuQ8UxISniVLB9ArQW9cN9pnvMZbAwLlnL4SsGfTKG4JcXYvi_eKhl6ZD/exec';
 
@@ -19,29 +18,33 @@
       }
     }
 
-    async function loadHistory() {
-      const historyDiv = document.getElementById('history');
-      const button = document.getElementById('historyButton');
-      button.disabled = true;
-      button.innerText = '⏳ Завантаження...';
-
-      try {
-        const resp = await fetch(WEBAPP_URL + '?history=1');
-        const html = await resp.text();
-        historyDiv.innerHTML = html;
-        historyDiv.style.display = 'block';
-        button.style.display = 'none';
-      } catch (err) {
-        historyDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
-        console.error('Помилка історії:', err);
-        button.disabled = false;
-        button.innerText = 'Переглянути історію';
+    async function loadHistoryIfNeeded() {
+      const historyTab = document.getElementById('history');
+      if (!historyTab.dataset.loaded) {
+        try {
+          const resp = await fetch(WEBAPP_URL + '?history=1');
+          const html = await resp.text();
+          historyTab.innerHTML = html;
+          historyTab.dataset.loaded = 'true';
+        } catch (err) {
+          historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+        }
       }
     }
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+
+      document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+
+      if (tabId === 'history') loadHistoryIfNeeded();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -54,36 +57,44 @@
 </head>
 <body>
   <div class="container">
-    <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+    <div class="topbar">
+      <button class="menu-toggle" onclick="alert('Меню буде реалізовано пізніше')">☰</button>
+      <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+    </div>
 
     <h2>Форма для передачі показників лічильника</h2>
 
-    <form id="meterForm">
-      <label>Попередній показник:
-        <input type="number" id="prevReading" readonly placeholder="Завантаження...">
-      </label>
+    <div class="tabs">
+      <button class="tab active" data-tab="form" onclick="switchTab('form')">🔌 Передача</button>
+      <button class="tab" data-tab="history" onclick="switchTab('history')">📊 Історія</button>
+    </div>
 
-      <label>Новий показник:
-        <input type="number" name="reading" required step="0.1" placeholder="Наприклад: 405.5">
-      </label>
+    <div id="form" class="tab-content active">
+      <form id="meterForm">
+        <label>Попередній показник:
+          <input type="number" id="prevReading" readonly placeholder="Завантаження...">
+        </label>
 
-      <label>Користувач:
-        <select name="name" required>
-          <option value="" disabled selected>Оберіть користувача</option>
-          <option value="eGolf">eGolf</option>
-          <option value="iONIQ">iONIQ</option>
-          <option value="інше">інше</option>
-        </select>
-      </label>
+        <label>Новий показник:
+          <input type="number" name="reading" required step="0.1" placeholder="Наприклад: 405.5">
+        </label>
 
-      <button type="submit">Відправити</button>
-    </form>
+        <label>Користувач:
+          <select name="name" required>
+            <option value="" disabled selected>Оберіть користувача</option>
+            <option value="eGolf">eGolf</option>
+            <option value="iONIQ">iONIQ</option>
+            <option value="інше">інше</option>
+          </select>
+        </label>
 
-    <button id="historyButton" type="button" onclick="loadHistory()">📊 Переглянути історію</button>
+        <button type="submit">Відправити</button>
+      </form>
 
-    <div id="history" style="display:none;"></div>
+      <p id="status"></p>
+    </div>
 
-    <p id="status"></p>
+    <div id="history" class="tab-content" data-loaded="false"></div>
   </div>
 
   <script>
