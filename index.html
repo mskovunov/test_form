@@ -18,19 +18,26 @@
       }
     }
 
-    async function loadHistoryIfNeeded() {
-      const historyTab = document.getElementById('history');
-      if (!historyTab.dataset.loaded) {
-        try {
-          const resp = await fetch(WEBAPP_URL + '?history=1');
-          const html = await resp.text();
-          historyTab.innerHTML = html;
-          historyTab.dataset.loaded = 'true';
-        } catch (err) {
-          historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
-        }
-      }
+  async function loadHistoryIfNeeded() {
+  const historyTab = document.getElementById('history');
+  console.log('Запуск загрузки історії');
+
+  if (!historyTab.dataset.loaded) {
+    console.log('Загрузка с сервера...');
+    try {
+      const resp = await fetch(WEBAPP_URL + '?history=1');
+      const html = await resp.text();
+      console.log('Ответ получен:', html);
+      historyTab.innerHTML = html;
+      historyTab.dataset.loaded = 'true';
+    } catch (err) {
+      console.error('Помилка при завантаженні історії:', err);
+      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
     }
+  } else {
+    console.log('Історія вже завантажена');
+  }
+}
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
