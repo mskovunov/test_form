@@ -20,22 +20,23 @@
 
   async function loadHistoryIfNeeded() {
   const historyTab = document.getElementById('history');
-  console.log('Запуск загрузки історії');
 
   if (!historyTab.dataset.loaded) {
-    console.log('Загрузка с сервера...');
     try {
-      const resp = await fetch(WEBAPP_URL + '?history=1');
-      const html = await resp.text();
-      console.log('Ответ получен:', html);
-      historyTab.innerHTML = html;
-      historyTab.dataset.loaded = 'true';
-    } catch (err) {
-      console.error('Помилка при завантаженні історії:', err);
-      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+      const response = await fetch(WEBAPP_URL + '?history=1');
+      const html = await response.text();
+      
+      if (html.trim().length === 0) {
+        historyTab.innerHTML = '<p>⚠️ Порожній результат</p>';
+      } else {
+        historyTab.innerHTML = html;
+        historyTab.dataset.loaded = 'true';
+      }
+
+    } catch (error) {
+      console.error('Помилка історії:', error);
+      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
     }
-  } else {
-    console.log('Історія вже завантажена');
   }
 }
 
