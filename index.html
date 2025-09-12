@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
   <script>
-    const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxvaqVHrzsLLx7czRY3aXtZRoidAi7ZCxCaS2TjFZ6Bi2R5gANcFJvKkQD90FYAJGcl/exec';
+    const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby7-ToHy_YNuQ8UxISniVLB9ArQW9cN9pnvMZbAwLlnL4SsGfTKG4JcXYvi_eKhl6ZD/exec';
 
     async function loadPreviousReading() {
       try {
@@ -18,31 +18,19 @@
       }
     }
 
-  async function loadHistoryIfNeeded() {
-    const historyTab = document.getElementById('history');
-
-    console.log('📥 Загрузка истории: старт');
-
-    if (historyTab.dataset.loaded === 'true') {
-      console.log('⏩ Уже загружено, пропускаем');
-      return;
+    async function loadHistoryIfNeeded() {
+      const historyTab = document.getElementById('history');
+      if (!historyTab.dataset.loaded) {
+        try {
+          const resp = await fetch(WEBAPP_URL + '?history=1');
+          const html = await resp.text();
+          historyTab.innerHTML = html;
+          historyTab.dataset.loaded = 'true';
+        } catch (err) {
+          historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+        }
+      }
     }
-
-    try {
-      const resp = await fetch(WEBAPP_URL + '?history=1');
-      console.log('📡 Ответ от GAS получен:', resp.status);
-
-      const html = await resp.text();
-      console.log('📄 HTML получен:', html.slice(0, 100), '...');
-
-      // Сюда вставим только тело (без id="history")
-      historyTab.innerHTML = html;
-      historyTab.dataset.loaded = 'true';
-    } catch (err) {
-      console.error('❌ Ошибка загрузки истории:', err);
-      historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії</p>';
-    }
-  }
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
@@ -50,26 +38,31 @@
     }
 
     function switchTab(tabId) {
-  console.log('Свитч вкладки:', tabId); // ➤ ДОБАВЛЕНО
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
 
-  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+      const selectedTabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
+      const selectedTabContent = document.getElementById(tabId);
 
-  const selectedTabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
-  const selectedTabContent = document.getElementById(tabId);
+      if (selectedTabBtn && selectedTabContent) {
+        selectedTabBtn.classList.add('active');
+        selectedTabContent.classList.add('active');
 
-  if (selectedTabBtn && selectedTabContent) {
-    selectedTabBtn.classList.add('active');
-    selectedTabContent.classList.add('active');
-
-    if (tabId === 'history') {
-      console.log('Загрузка истории...'); // ➤ ДОБАВЛЕНО
-      loadHistoryIfNeeded();
+        if (tabId === 'history') {
+          loadHistoryIfNeeded();
+        }
+      }
     }
-  } else {
-    console.error('❌ Таб с id', tabId, 'не найден');
-  }
-}
+
+    function toggleMenu() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('overlay').classList.toggle('show');
+    }
+
+    function clearData() {
+      localStorage.clear();
+      location.reload();
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
       loadPreviousReading();
@@ -80,17 +73,30 @@
   </script>
 </head>
 <body>
+  <div id="overlay" onclick="toggleMenu()"></div>
+
+  <nav id="sidebar">
+    <h3>☰ Меню</h3>
+    <ul>
+      <li><strong>👤 Користувач:</strong> <span id="userDisplay">-</span></li>
+      <li><button onclick="toggleTheme()">🌗 Змінити тему</button></li>
+      <li><button onclick="switchTab('form'); toggleMenu()">🔌 Передача</button></li>
+      <li><button onclick="switchTab('history'); toggleMenu()">📊 Історія</button></li>
+      <li><button onclick="clearData()">🚪 Очистити дані</button></li>
+    </ul>
+  </nav>
+
   <div class="container">
     <div class="topbar">
-      <button class="menu-toggle" onclick="alert('Меню буде реалізовано пізніше')">☰</button>
+      <button class="menu-toggle" onclick="toggleMenu()">☰</button>
       <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
     </div>
 
     <h2>Форма для передачі показників лічильника</h2>
 
     <div class="tabs">
-      <button class="tab active" data-tab="form" onclick="switchTab('form')">🔌 Передача</button>
-      <button class="tab" data-tab="history" onclick="switchTab('history')">📊 Історія</button>
+      <button type="button" class="tab active" data-tab="form" onclick="switchTab('form')">🔌 Передача</button>
+      <button type="button" class="tab" data-tab="history" onclick="switchTab('history')">📊 Історія</button>
     </div>
 
     <div id="form" class="tab-content active">
@@ -104,7 +110,7 @@
         </label>
 
         <label>Користувач:
-          <select name="name" required>
+          <select name="name" required onchange="document.getElementById('userDisplay').innerText = this.value;">
             <option value="" disabled selected>Оберіть користувача</option>
             <option value="eGolf">eGolf</option>
             <option value="iONIQ">iONIQ</option>
@@ -163,6 +169,8 @@
           `;
           setTimeout(() => win.close(), 3000);
         }
+
+        document.getElementById('userDisplay').innerText = '-';
       }
     });
   </script>
