@@ -278,3 +278,45 @@ button:hover {
   opacity: 1;
   visibility: visible;
 }
+
+#portStatusWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background-color: var(--input-bg);
+}
+
+#portIndicator {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+#portIndicator.available {
+  background-color: #2e7d32; /* зелений */
+}
+
+#portIndicator.busy {
+  background-color: #c62828; /* червоний */
+}
+
+#togglePortBtn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  background-color: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+}
+
+#togglePortBtn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
