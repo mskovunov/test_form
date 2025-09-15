@@ -73,20 +73,22 @@
   </script>
 </head>
 <body>
-  <div id="overlay" onclick="toggleMenu()"></div>
-
-  <nav id="sidebar">
-    <h3>☰ Меню</h3>
-    <ul>
-      <li><strong>👤 Користувач:</strong> <span id="userDisplay">-</span></li>
-      <li><button onclick="toggleTheme()">🌗 Змінити тему</button></li>
-      <li><button onclick="switchTab('form'); toggleMenu()">🔌 Передача</button></li>
-      <li><button onclick="switchTab('history'); toggleMenu()">📊 Історія</button></li>
-      <li><button onclick="clearData()">🚪 Очистити дані</button></li>
-    </ul>
-  </nav>
-
   <div class="container">
+    <!-- Меню внутри контейнера -->
+    <div class="menu-wrapper">
+      <nav id="sidebar">
+        <h3>☰ Меню</h3>
+        <ul>
+          <li><strong>👤 Користувач:</strong> <span id="userDisplay">-</span></li>
+          <li><button onclick="toggleTheme()">🌗 Змінити тему</button></li>
+          <li><button onclick="switchTab('form'); toggleMenu()">🔌 Передача</button></li>
+          <li><button onclick="switchTab('history'); toggleMenu()">📊 Історія</button></li>
+          <li><button onclick="clearData()">🚪 Очистити дані</button></li>
+        </ul>
+      </nav>
+      <div id="overlay" onclick="toggleMenu()"></div>
+    </div>
+
     <div class="topbar">
       <button class="menu-toggle" onclick="toggleMenu()">☰</button>
       <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
@@ -161,14 +163,6 @@
         form.reset();
         status.classList.add("show");
         setTimeout(() => status.classList.remove("show"), 3000);
-
-        if (win) {
-          win.document.body.innerHTML = `
-            <h2>${success ? "✅ Дані успішно відправлені!" : "⚠️ Дані відправлені з попередженням!"}</h2>
-            <p>Це вікно закриється через 3 секунди...</p>
-          `;
-          setTimeout(() => win.close(), 3000);
-        }
 
         document.getElementById('userDisplay').innerText = '-';
       }
