@@ -48,6 +48,7 @@ body {
   width: 100%;
   max-width: 400px;
   text-align: center;
+  position: relative; /* важно, чтобы sidebar позиционировался внутри */
 }
 
 h2 {
@@ -279,18 +280,23 @@ button:hover {
 
 /* ======= Боковое меню ======= */
 
+.menu-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
 #sidebar {
-  position: fixed;
-  left: -250px;
+  position: absolute;
+  left: -240px;
   top: 0;
-  width: 250px;
+  width: 220px;
   height: 100%;
   background-color: var(--input-bg);
   color: var(--text-color);
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.2);
   padding: 20px;
   transition: left 0.3s ease;
-  z-index: 1000;
+  z-index: 10;
 }
 
 #sidebar.open {
@@ -328,7 +334,7 @@ button:hover {
 }
 
 #overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
@@ -336,7 +342,7 @@ button:hover {
   background: rgba(0,0,0,0.4);
   opacity: 0;
   visibility: hidden;
-  z-index: 900;
+  z-index: 9;
   transition: opacity 0.3s ease;
 }
 
