@@ -18,50 +18,26 @@
       }
     }
 
-    async function loadHistoryIfNeeded() {
-      const historyTab = document.getElementById('history');
-      if (!historyTab.dataset.loaded) {
-        try {
-          const resp = await fetch(WEBAPP_URL + '?history=1');
-          const html = await resp.text();
-          historyTab.innerHTML = html;
-          historyTab.dataset.loaded = 'true';
-        } catch (err) {
-          historyTab.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
-        }
-      }
-    }
-
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(div => div.classList.remove('active'));
+    // 🟢🔴 Статус порту
+    function updatePortStatusUI() {
+      const status = localStorage.getItem("portStatus") || "available";
+      const indicator = document.getElementById("portIndicator");
+      const text = document.getElementById("portText");
 
-      const selectedTabBtn = document.querySelector(`.tab[data-tab="${tabId}"]`);
-      const selectedTabContent = document.getElementById(tabId);
-
-      if (selectedTabBtn && selectedTabContent) {
-        selectedTabBtn.classList.add('active');
-        selectedTabContent.classList.add('active');
-
-        if (tabId === 'history') {
-          loadHistoryIfNeeded();
-        }
-      }
+      indicator.className = status;
+      text.textContent = status === "available" ? "Порт доступний" : "Порт зайнятий";
     }
 
-    function toggleMenu() {
-      document.getElementById('sidebar').classList.toggle('open');
-      document.getElementById('overlay').classList.toggle('show');
-    }
-
-    function clearData() {
-      localStorage.clear();
-      location.reload();
+    function togglePortStatus() {
+      const current = localStorage.getItem("portStatus") || "available";
+      const next = current === "available" ? "busy" : "available";
+      localStorage.setItem("portStatus", next);
+      updatePortStatusUI();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -69,63 +45,44 @@
       if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark');
       }
+      updatePortStatusUI(); // 👈 оновлюємо статус порту при завантаженні
     });
   </script>
 </head>
 <body>
   <div class="container">
-    <div class="menu-wrapper">
-      <nav id="sidebar">
-        <h3>☰ Меню</h3>
-        <ul>
-          <li><strong>👤 Користувач:</strong> <span id="userDisplay">-</span></li>
-          <li><button onclick="toggleTheme()">🌗 Змінити тему</button></li>
-          <li><button onclick="switchTab('form'); toggleMenu()">🔌 Передача</button></li>
-          <li><button onclick="switchTab('history'); toggleMenu()">📊 Історія</button></li>
-          <li><button onclick="clearData()">🚪 Очистити дані</button></li>
-        </ul>
-      </nav>
-      <div id="overlay" onclick="toggleMenu()"></div>
-    </div>
-
-    <div class="topbar">
-      <button class="menu-toggle" onclick="toggleMenu()">☰</button>
-      <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
-    </div>
+    <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
 
     <h2>Форма для передачі показників лічильника</h2>
 
-    <div class="tabs">
-      <button type="button" class="tab active" data-tab="form" onclick="switchTab('form')">🔌 Передача</button>
-      <button type="button" class="tab" data-tab="history" onclick="switchTab('history')">📊 Історія</button>
+    <div id="portStatusWrapper">
+      <span id="portIndicator" class="available"></span>
+      <span id="portText">Порт доступний</span>
+      <button id="togglePortBtn" type="button" onclick="togglePortStatus()">🔁 Змінити статус</button>
     </div>
 
-    <div id="form" class="tab-content active">
-      <form id="meterForm">
-        <label>Попередній показник:
-          <input type="number" id="prevReading" readonly placeholder="Завантаження...">
-        </label>
+    <form id="meterForm">
+      <label>Попередній показник:
+        <input type="number" id="prevReading" readonly placeholder="Завантаження...">
+      </label>
 
-        <label>Новий показник:
-          <input type="number" name="reading" required step="0.1" placeholder="Наприклад: 405.5">
-        </label>
+      <label>Новий показник:
+        <input type="number" name="reading" required step="0.1" placeholder="Наприклад: 405.5">
+      </label>
 
-        <label>Користувач:
-          <select name="name" required onchange="document.getElementById('userDisplay').innerText = this.value;">
-            <option value="" disabled selected>Оберіть користувача</option>
-            <option value="eGolf">eGolf</option>
-            <option value="iONIQ">iONIQ</option>
-            <option value="інше">інше</option>
-          </select>
-        </label>
+      <label>Користувач:
+        <select name="name" required>
+          <option value="" disabled selected>Оберіть користувача</option>
+          <option value="eGolf">eGolf</option>
+          <option value="iONIQ">iONIQ</option>
+          <option value="інше">інше</option>
+        </select>
+      </label>
 
-        <button type="submit">Відправити</button>
-      </form>
+      <button type="submit">Відправити</button>
+    </form>
 
-      <p id="status"></p>
-    </div>
-
-    <div id="history" class="tab-content" data-loaded="false"></div>
+    <p id="status"></p>
   </div>
 
   <script>
@@ -163,7 +120,13 @@
         status.classList.add("show");
         setTimeout(() => status.classList.remove("show"), 3000);
 
-        document.getElementById('userDisplay').innerText = '-';
+        if (win) {
+          win.document.body.innerHTML = `
+            <h2>${success ? "✅ Дані успішно відправлені!" : "⚠️ Дані відправлені з попередженням!"}</h2>
+            <p>Це вікно закриється через 3 секунди...</p>
+          `;
+          setTimeout(() => win.close(), 3000);
+        }
       }
     });
   </script>
