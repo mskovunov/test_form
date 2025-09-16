@@ -5,6 +5,7 @@
   <title>Передача показників</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
+
   <script>
     const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby7-ToHy_YNuQ8UxISniVLB9ArQW9cN9pnvMZbAwLlnL4SsGfTKG4JcXYvi_eKhl6ZD/exec';
 
@@ -15,6 +16,26 @@
         document.getElementById('prevReading').value = val;
       } catch (err) {
         console.error('Помилка при отриманні попереднього показника:', err);
+      }
+    }
+
+    async function loadHistory() {
+      const historyDiv = document.getElementById('history');
+      const button = document.getElementById('historyButton');
+      button.disabled = true;
+      button.innerText = '⏳ Завантаження...';
+
+      try {
+        const resp = await fetch(WEBAPP_URL + '?history=1');
+        const html = await resp.text();
+        historyDiv.innerHTML = html;
+        historyDiv.style.display = 'block';
+        button.style.display = 'none';
+      } catch (err) {
+        historyDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+        console.error('Помилка історії:', err);
+        button.disabled = false;
+        button.innerText = 'Переглянути історію';
       }
     }
 
@@ -57,6 +78,10 @@
 
       <button type="submit">Відправити</button>
     </form>
+
+    <button id="historyButton" type="button" onclick="loadHistory()">📊 Переглянути історію</button>
+
+    <div id="history" style="display:none;"></div>
 
     <p id="status"></p>
   </div>
