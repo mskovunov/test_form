@@ -73,11 +73,37 @@ function setupPortStatusToggle() {
         document.body.classList.add('dark');
       }
     });
+	function toggleMenu() {
+  const menu = document.getElementById("sideMenu");
+  menu.classList.toggle("open");
+}
+
   </script>
 </head>
 <body>
   <div class="container">
-    <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+  	  <!-- Кнопка меню -->
+	<button class="menu-button" onclick="toggleMenu()">
+	  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+		<path d="M4 6H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+		<path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+		<path d="M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+	  </svg>
+	</button>
+  <div class="form-wrapper">
+
+
+	<!-- Боковое меню -->
+	<div class="side-menu" id="sideMenu">
+	  <button class="close-button" onclick="toggleMenu()">❌</button>
+	  <ul>
+		<li><a href="#">ℹ️ Про систему</a></li>
+		<li><a href="#">📈 Статистика</a></li>
+		<li><a href="#">⚙️ Налаштування</a></li>
+	  </ul>
+	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+	</div>
+    
 
     <h2>Форма для передачі показників лічильника</h2>
 
@@ -125,6 +151,7 @@ function setupPortStatusToggle() {
     <div id="history" style="display:none;"></div>
 
     <p id="status"></p>
+  </div>
   </div>
 
   <script>
