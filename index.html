@@ -43,8 +43,31 @@
       const isDark = document.body.classList.toggle('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
+	
+function updatePortToggleUI(status) {
+  const toggle = document.getElementById("portToggle");
+  const text = document.getElementById("portStatusText");
+  const indicator = document.getElementById("portIndicator");
+
+  toggle.checked = status === "busy"; // ВКЛ означает busy
+  text.textContent = status === "busy" ? "Зайнятий" : "Доступний";
+  indicator.style.backgroundColor = status === "busy" ? "#c62828" : "#2e7d32";
+}
+
+function togglePortStatus() {
+  const isBusy = document.getElementById("portToggle").checked;
+  const status = isBusy ? "busy" : "available";
+  localStorage.setItem("portStatus", status);
+  updatePortToggleUI(status);
+}
+
+function setupPortStatusToggle() {
+  const saved = localStorage.getItem("portStatus") || "available";
+  updatePortToggleUI(saved);
+}
 
     window.addEventListener('DOMContentLoaded', () => {
+	  setupPortStatusToggle();
       loadPreviousReading();
       if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark');
@@ -58,7 +81,25 @@
 
     <h2>Форма для передачі показників лічильника</h2>
 
+<label>🔌 Статус порта зарядки: </label>
+<div class="port-status-block">
+  <div class="port-status-content">
+    <div class="port-indicator" id="portIndicator">
+      <img src="img/Type_2_transp.png" alt="Type-2 порт" class="port-icon">
+    </div>
+    
+  <div class="port-toggle-wrapper">
+    <label class="switch">
+      <input type="checkbox" id="portToggle" onchange="togglePortStatus()">
+      <span class="slider"></span>
+    </label>
+    <div id="portStatusText" class="port-status-label">Доступний</div>
+  </div>
+  </div>
+</div>
+	
     <form id="meterForm">
+	
       <label>Попередній показник:
         <input type="number" id="prevReading" readonly placeholder="Завантаження...">
       </label>
