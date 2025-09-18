@@ -218,3 +218,115 @@ button:hover {
     font-size: 0.85rem;
   }
 }
+
+.port-status-block {
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 15px 16px;
+  background-color: var(--input-bg);
+  margin-bottom: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.port-status-block h3 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+.port-status-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.port-indicator {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background-color: #2e7d32; /* default green */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+.port-icon {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: brightness(1);
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 28px;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+  background-color: var(--button-bg);
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(24px);
+}
+
+#portStatusText {
+  min-width: 80px;
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.port-toggle-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.port-status-label {
+  font-size: 0.95rem;
+  color: var(--text-color);
+  text-align: center;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px; /* было 15px */
+  text-align: left;
+  color: var(--text-color);
+  font-size: 1rem;
+}
