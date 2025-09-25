@@ -142,13 +142,14 @@ button:hover {
 .theme-toggle {
   background: none;
   border: 1px solid var(--input-border);
-  padding: 6px 10px;
+  padding: 10px 15px;
   margin-bottom: 20px;
   border-radius: 6px;
   font-size: 0.9rem;
   cursor: pointer;
   color: var(--text-color);
   transition: background-color 0.3s;
+  margin-left: 5px;
 }
 
 .theme-toggle:hover {
@@ -244,8 +245,8 @@ button:hover {
 }
 
 .port-indicator {
-  width: 100px;
-  height: 100px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background-color: #2e7d32; /* default green */
   display: flex;
@@ -257,8 +258,8 @@ button:hover {
 }
 
 .port-icon {
-  width: 96px;
-  height: 96px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
   filter: brightness(1);
 }
