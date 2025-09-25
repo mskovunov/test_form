@@ -7,8 +7,7 @@
   <link rel="stylesheet" href="style.css">
 
   <script>
-    //const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby7-ToHy_YNuQ8UxISniVLB9ArQW9cN9pnvMZbAwLlnL4SsGfTKG4JcXYvi_eKhl6ZD/exec';
-	const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyvl_C5rbp6v9Xk_zHv-cbxNNhvbgXCzghiq7gxXol-AynQDOZWYdNuf9-ECriA7J0G/exec';
+    const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyvl_C5rbp6v9Xk_zHv-cbxNNhvbgXCzghiq7gxXol-AynQDOZWYdNuf9-ECriA7J0G/exec';
 
     async function loadPreviousReading() {
       try {
@@ -55,12 +54,23 @@ function updatePortToggleUI(status) {
   indicator.style.backgroundColor = status === "busy" ? "#c62828" : "#2e7d32";
 }
 
-function togglePortStatus() {
-  const isBusy = document.getElementById("portToggle").checked;
-  const status = isBusy ? "busy" : "available";
-  localStorage.setItem("portStatus", status);
-  updatePortToggleUI(status);
-}
+    function togglePortStatus() {
+      const isBusy = document.getElementById("portToggle").checked;
+      const status = isBusy ? "busy" : "available";
+      const statusValue = isBusy ? "1" : "0";
+
+      localStorage.setItem("portStatus", status);
+      updatePortToggleUI(status);
+
+      fetch(WEBAPP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ portStatus: statusValue })
+      })
+      .then(res => res.text())
+      .then(console.log)
+      .catch(console.error);
+    }
 
 function setupPortStatusToggle() {
   const saved = localStorage.getItem("portStatus") || "available";
