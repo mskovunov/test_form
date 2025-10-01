@@ -7,27 +7,82 @@
     <link rel="stylesheet" href="style.css">
 
     <script>
-        // WEBAPP_URL нужен для загрузки истории
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyvl_C5rbp6v9Xk_zHv-cbxNNhvbgXCzghiq7gxXol-AynQDOZWYdNuf9-ECriA7J0G/exec';
 
-        async function loadHistory() {
-            const historyDiv = document.getElementById('history');
-            const statusDiv = document.getElementById('loadingStatus');
+        // Список месяцев, на основе Ваших данных за 2025 год
+        const MONTHS = [
+		    { value: "2025-10", text: "Жовтень 2025" }, // <--- ДОБАВЛЕНО
+            { value: "2025-09", text: "Вересень 2025" },
+            { value: "2025-08", text: "Серпень 2025" },
+            { value: "2025-07", text: "Липень 2025" },
+            { value: "2025-06", text: "Червень 2025" },
+            { value: "2025-05", text: "Травень 2025" },
+            { value: "2025-04", text: "Квітень 2025" },
+            { value: "2025-03", text: "Березень 2025" },
+            { value: "2025-02", text: "Лютий 2025" },
+        ];
 
-            statusDiv.innerHTML = '⏳ Завантаження історії...';
-            statusDiv.style.display = 'block';
-            historyDiv.innerHTML = ''; // Очистка предыдущей истории
+        function populateMonthSelector() {
+            const selector = document.getElementById('monthSelector');
+            
+          
 
-            try {
-                const resp = await fetch(WEBAPP_URL + '?history=1');
-                const html = await resp.text();
-                historyDiv.innerHTML = html;
-                statusDiv.style.display = 'none'; // Скрываем статус после загрузки
-            } catch (err) {
-                statusDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
-                console.error('Помилка історії:', err);
-            }
+            // Добавляем месяцы
+            MONTHS.forEach(month => {
+                const option = document.createElement('option');
+                option.value = month.value;
+                option.textContent = month.text;
+                selector.appendChild(option);
+            });
+            
+            // Устанавливаем последний месяц (Сентябрь) как выбранный по умолчанию
+            selector.value = MONTHS[0].value;
         }
+
+       // history.html (внутри <script>)
+
+async function loadHistory() {
+    const historyDiv = document.getElementById('history');
+    const statusDiv = document.getElementById('loadingStatus');
+    const monthSelector = document.getElementById('monthSelector');
+    
+    const selectedMonth = monthSelector.value;
+    const monthName = monthSelector.options[monthSelector.selectedIndex].text;
+
+    statusDiv.innerHTML = `⏳ Завантаження історії за ${monthName}...`;
+    statusDiv.style.display = 'block';
+    historyDiv.innerHTML = ''; 
+
+    let url = WEBAPP_URL + '?history=1';
+    
+    // Если выбран конкретный месяц, добавляем его в URL
+    if (selectedMonth) {
+        url += `&month=${selectedMonth}`;
+    } else {
+        // ИЗМЕНЕНИЕ ЗДЕСЬ: Обновляем статус, если выбрана вся история
+        statusDiv.innerHTML = `⏳ Завантаження усієї історії...`; 
+    }
+
+    try {
+        const resp = await fetch(url);
+        const html = await resp.text();
+        
+        // ... (остальной код проверки на пустоту) ...
+
+        if (html.trim() === '' || html.length < 50) { 
+             // Это сообщение отобразится, если выбрана "Уся історія", а данных нет.
+             historyDiv.innerHTML = `<p style="text-align: center; color: var(--text-color); margin-top: 30px;">Записів за ${monthName} не знайдено.</p>`;
+        } else {
+             historyDiv.innerHTML = html;
+        }
+
+        statusDiv.style.display = 'none';
+
+    } catch (err) {
+        statusDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
+        console.error('Помилка історії:', err);
+    }
+}
         
         function toggleTheme() {
             const isDark = document.body.classList.toggle('dark');
@@ -44,8 +99,9 @@
             if (localStorage.getItem('theme') === 'dark') {
                 document.body.classList.add('dark');
             }
-            // АВТОМАТИЧЕСКАЯ ЗАГРУЗКА ИСТОРИИ
-            loadHistory(); 
+            
+            populateMonthSelector(); 
+            loadHistory(); // Загрузка истории для выбранного по умолчанию месяца
         });
     </script>
 </head>
@@ -64,13 +120,20 @@
                 <button class="close-button" onclick="toggleMenu()">❌</button>
                 <ul>
                     <li><a href="index.html">🏠 Головна</a></li> 
-                    <li><a href="history.html">📜 Історія</a></li> <li><a href="stats.html">📈 Статистика</a></li>
+                    <li><a href="history.html">📜 Історія</a></li> 
+                    <li><a href="stats.html">📈 Статистика</a></li>
                     <li><a href="#">⚙️ Налаштування</a></li>
                 </ul>
                 <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
             </div>
 
             <h2>Історія передачі показників</h2>
+            
+            <div style="margin-bottom: 20px; text-align: left;">
+                <label for="monthSelector" style="font-weight: bold; margin-bottom: 5px;">Вибрати період:</label>
+                <select id="monthSelector" onchange="loadHistory()">
+                    </select>
+            </div>
             
             <div id="loadingStatus" style="display:none; text-align:center; padding: 20px;"></div>
             
