@@ -49,6 +49,8 @@ body {
   width: 100%;
   max-width: 400px;
   text-align: center;
+  min-height: 80vh; /* ГАРАНТИРУЕТ, что высота контейнера не меньше высоты окна */
+  padding-bottom: 20px; /* Дополнительный отступ снизу */
 }
 
 h2 {
@@ -219,6 +221,7 @@ button:hover {
   #history table {
     font-size: 0.85rem;
   }
+  
 }
 
 .port-status-block {
@@ -409,6 +412,7 @@ label {
   gap: 10px; /* Добавляет пространство между иконкой и текстом */
   /* Добавляем общие отступы по краям */
   padding: 10px 20px; 
+
 }
 
 .side-menu a:hover {
@@ -418,6 +422,7 @@ label {
 .form-wrapper {
   position: relative;
   overflow: hidden; /* важно, чтобы меню не вылезало за пределы формы */
+  min-height: 80vh;
 }
 
 /* Правила для меню внутри form-wrapper */
@@ -436,8 +441,25 @@ label {
   z-index: 10;
   display: flex;
   flex-direction: column;
+  
 }
 
 .form-wrapper .side-menu.open {
   transform: translateX(0); /* Показывает меню */
+}
+
+/* Новый стиль для контейнера с прокруткой */
+.chart-container-scroll {
+    /* Если контейнер становится шире его родителя (например, на мобильном),
+       появляется горизонтальная полоса прокрутки */
+    overflow-x: auto; 
+    /* Добавляем небольшой отступ, чтобы полоса прокрутки выглядела лучше */
+    padding-bottom: 10px; 
+}
+
+/* Убедитесь, что сам iframe не растягивается сверх 100% родителя,
+   чтобы контейнер управлял прокруткой. */
+.chart-container-scroll iframe {
+    /* Максимальная ширина iframe ограничена контейнером */
+    max-width: none; 
 }
