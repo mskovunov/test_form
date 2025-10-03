@@ -8,6 +8,7 @@
 
   <script>
     const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyvl_C5rbp6v9Xk_zHv-cbxNNhvbgXCzghiq7gxXol-AynQDOZWYdNuf9-ECriA7J0G/exec';
+	const BUILD_VERSION = 'v2025.10.01'; // <-- ДОБАВЛЕНО
 
     async function loadPreviousReading() {
       try {
@@ -38,6 +39,15 @@
         button.innerText = 'Переглянути історію';
       }
     }
+	
+	window.addEventListener('DOMContentLoaded', () => {
+    setupPortStatusToggle();
+    loadPreviousReading();
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark');
+    }
+    document.getElementById('buildVersion').textContent = BUILD_VERSION; // <-- ДОБАВЛЕНО
+});
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
@@ -61,6 +71,24 @@ function updatePortToggleUI(status) {
 
       localStorage.setItem("portStatus", status);
       updatePortToggleUI(status);
+
+// --- ДОБАВЛЕН ВЫЗОВ УВЕДОМЛЕНИЯ ANDROID ---
+      let notificationTitle;
+      let notificationMessage;
+      
+      if (status === "busy") {
+          notificationTitle = "Статус порта: ЗАЙНЯТИЙ";
+          notificationMessage = "Порт зарядки позначено як зайнятий.";
+      } else {
+          notificationTitle = "Статус порта: ДОСТУПНИЙ";
+          notificationMessage = "Порт зарядки знову доступний для використання!";
+      }
+
+      if (typeof AndroidNotifier !== 'undefined') {
+          // Вызываем нативный метод, который покажет системное уведомление
+          AndroidNotifier.showNotification(notificationTitle, notificationMessage);
+      }
+      // ------------------------------------------
 
       fetch(WEBAPP_URL, {
         method: "POST",
@@ -92,6 +120,7 @@ function setupPortStatusToggle() {
   </script>
 </head>
 <body>
+
   <div class="container">
   	  <!-- Кнопка меню -->
 	<button class="menu-button" onclick="toggleMenu()">
@@ -162,7 +191,10 @@ function setupPortStatusToggle() {
 
     <div id="history" style="display:none;"></div>
 
-    <p id="status"></p>
+ <p id="status"></p>
+    
+    <p id="buildVersion" style="margin-top: 20px; font-size: 0.75rem; color: #999; text-align: center;"></p>
+</div>
   </div>
   </div>
 
