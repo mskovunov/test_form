@@ -27,7 +27,7 @@
 		<li><a href="index.html">🏠 Головна</a></li> 
 		<li><a href="history.html">📜 Історія</a></li> 
 		<li><a href="stats.html">📈 Статистика</a></li>
-		<li><a href="#">⚙️ Налаштування</a></li>
+		<li><a href="settings.html">⚙️ Налаштування</a></li>
 		<li><a href="#" onclick="closeWebView()">🚪 Вихід</a></li> 
 	  </ul>
 	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
@@ -60,7 +60,7 @@
       </label>
 
       <label>Новий показник:
-        <input type="number" name="reading" required step="0.1" min="0" oninput="filterNumericInput(event)" placeholder="Наприклад: 405.5">
+        <input type="number" name="reading" required step="0.1" min="0" placeholder="Наприклад: 405.5">
       </label>
 
       <label>Користувач:
@@ -218,31 +218,7 @@ function updatePortToggleUI(status) {
 	  menu.classList.toggle("open");
 	}
 
-	/* --- ДОБАВЛЕНО: ФУНКЦИЯ ДЛЯ СТРОГОЙ ФИЛЬТРАЦИИ ВВОДА --- */
-	function filterNumericInput(event) {
-		let value = event.target.value;
-    
-    // 1. Удаляем знак минуса (для совместимости, хотя min="0" уже помогает)
-    if (value.startsWith('-')) {
-        value = value.substring(1);
-    }
-    
-    // 2. Оставляем только цифры, точку и запятую
-    // [^0-9.,] означает "все, кроме 0-9, точки и запятой"
-    value = value.replace(/[^0-9.,]/g, '');
-    
-    // 3. Дополнительная фильтрация: разрешаем только одну точку или одну запятую
-    // (Хотя HTML input type="number" это обрабатывает, это хорошая защита)
-    const parts = value.split(/[.,]/);
-    if (parts.length > 2) {
-        // Если частей больше двух (т.е. более одного разделителя), берем только первую часть + разделитель + вторую часть
-        const separator = value.match(/[.,]/g)[0];
-        value = parts[0] + separator + parts[1];
-    }
-    
-    event.target.value = value;
-}
-
+	
     const form = document.getElementById("meterForm");
     const status = document.getElementById("status");
 

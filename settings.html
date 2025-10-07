@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Налаштування розсилки</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Кнопка меню -->
+        <button class="menu-button" onclick="toggleMenu()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+
+        <div class="form-wrapper">
+
+            <!-- Боковое меню (Убрано, чтобы избежать дублирования кода) -->
+            <div class="side-menu" id="sideMenu">
+                <button class="close-button" onclick="toggleMenu()">❌</button>
+                <ul>
+                    <li><a href="index.html">🏠 Головна</a></li> 
+                    <li><a href="history.html">📜 Історія</a></li> 
+                    <li><a href="stats.html">📈 Статистика</a></li>
+                    <li><a href="settings.html">⚙️ Налаштування</a></li>
+                    <li><a href="#" onclick="closeWebView()">🚪 Вихід</a></li>
+                </ul>
+                <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+            </div>
+
+            <!-- Основное содержимое -->
+            <h2>Системні налаштування</h2>
+
+            <!-- configStatus БЫЛ ЗДЕСЬ -->
+            
+            <div id="configTableContainer" style="margin-top: 20px; text-align: left;">
+                <!-- Сюда будет загружена таблица -->
+            </div>
+            
+            <!-- ИЗМЕНЕНИЕ: ПЕРЕМЕЩЕННЫЙ configStatus -->
+            <div id="configStatus" class="status-message" style="text-align: center; margin-top: 20px;"></div>
+            
+            
+            <!-- Версия сборки -->
+            <p id="buildVersion" style="margin-top: 20px; font-size: 0.75rem; color: #999; text-align: center;"></p>
+            
+        </div>
+    </div>
+
+    <script>
+        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxiFpwrkbINal0wGhPxMy0wd452HF3Q64yPqXyntLG9HC7gIus6zY2hQoqrcWH_EROf/exec';
+        
+        // --- Вспомогательные функции ---
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        function toggleMenu() {
+            const menu = document.getElementById("sideMenu");
+            menu.classList.toggle("open");
+        }
+
+        function getBuildVersion() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `v${year}.${month}.${day}.${hours}${minutes}`; 
+        }
+
+        function closeWebView() {
+            console.log("Attempting to close WebView...");
+            if (typeof Android !== 'undefined' && Android.closeApp) {
+                Android.closeApp();
+            } else {
+                console.warn("Native Android closeApp interface not found. Cannot close application.");
+            }
+        }
+
+        /* --- НОВЫЕ ФУНКЦИИ: Переключение статуса Email и PUSH --- */
+        
+        // --- Общая функция для отправки запроса на обновление ---
+        async function updateConfigStatus(sheetRow, currentFlag, targetColumn, event) {
+            // targetColumn: 5 для Email (E) или 6 для PUSH (F)
+            
+            // Предотвращаем обработку клика несколько раз
+            if (event.target.classList.contains('status-loading')) return;
+
+            const statusDiv = document.getElementById('configStatus');
+            const newStatus = currentFlag === '1' ? '0' : '1';
+            
+            // Включаем индикатор загрузки на элементе
+            const indicator = event.target;
+            const originalHTML = indicator.innerHTML;
+            indicator.innerHTML = '🔄';
+            indicator.classList.add('status-loading');
+            
+            statusDiv.innerHTML = `⏳ Оновлення статусу рядка ${sheetRow} у колонці ${targetColumn}...`;
+            statusDiv.style.display = 'block';
+
+            try {
+                const formData = new FormData();
+                formData.append('updateConfig', '1');
+                formData.append('row', sheetRow); 
+                formData.append('status', newStatus);
+                // НОВОЕ: Передаем в GAS номер колонки для обновления
+                formData.append('column', targetColumn); 
+
+                const resp = await fetch(WEBAPP_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const responseText = await resp.text();
+
+                if (responseText.includes('Success')) {
+                    statusDiv.innerHTML = '✅ Статус оновлено успішно.';
+                    // Обновляем всю таблицу, чтобы отразить изменения
+                    await loadConfig(); 
+                } else {
+                    throw new Error(responseText);
+                }
+
+            } catch (err) {
+                statusDiv.innerHTML = `<p style="color: var(--status-error);">⚠️ Помилка оновлення: ${err.message || 'Невідома помилка'}</p>`;
+                console.error('Помилка POST-запиту:', err);
+                
+                // Откатываем UI изменения при ошибке
+                indicator.innerHTML = originalHTML;
+                indicator.classList.remove('status-loading');
+            }
+            
+            // Скрываем статус через короткое время
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+        }
+        
+        // Функция для колонки "Отримувати Email" (Колонка E, индекс 5)
+        async function toggleEmailStatus(sheetRow, currentFlag, event) {
+            await updateConfigStatus(sheetRow, currentFlag, 5, event);
+        }
+
+        // Функция для колонки "Отримувати PUSH" (Колонка F, индекс 6)
+        async function togglePushStatus(sheetRow, currentFlag, event) {
+            await updateConfigStatus(sheetRow, currentFlag, 6, event);
+        }
+        /* --- КОНЕЦ НОВЫХ ФУНКЦИЙ --- */
+
+        // --- ОСНОВНАЯ ФУНКЦИЯ: Загрузка конфигурации рассылки ---
+        async function loadConfig() {
+            const configDiv = document.getElementById('configTableContainer');
+            const statusDiv = document.getElementById('configStatus');
+            
+            statusDiv.innerHTML = '⏳ Завантаження конфігурації...';
+            statusDiv.style.display = 'block';
+
+            try {
+                // Запрос к GAS для получения данных в формате JSON
+                const resp = await fetch(WEBAPP_URL + '?getConfig=1'); 
+                const dataText = await resp.text(); // Ожидаем TEXT для CORS
+                const data = JSON.parse(dataText);
+                
+                if (!data || data.length === 0) {
+                    configDiv.innerHTML = '<p>Конфігурація розсилки не знайдена або пуста.</p>';
+                } else {
+                    renderConfigTable(data, configDiv);
+                }
+
+                statusDiv.style.display = 'none';
+
+            } catch (err) {
+                statusDiv.innerHTML = '<p style="color: var(--status-error);">⚠️ Помилка при завантаженні конфігурації. Перевірте GAS.</p>';
+                configDiv.innerHTML = '';
+                console.error('Помилка конфігурації:', err);
+            }
+        }
+
+        // --- ИЗМЕНЕНИЕ: Рендеринг таблицы с улучшенными стилями, статусом и CLICK-обработчиком ---
+        function renderConfigTable(data, container) {
+            let html = `
+                <h3>Налаштування сповіщень користувачів</h3>
+                <div class="table-scroll">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Користувач</th>
+                            <!-- <th>Email</th> -->
+                            <th class="status-col">Отримувати Email</th>
+							<th class="status-col">Отримувати PUSH</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach((row, index) => {
+                const isEmailActive = row.flag === '1';
+                const isPushActive = row.flagP === '1'; 
+                // Номер строки в Google Sheet: index + 2 (т.к. читаем с A2)
+                const sheetRow = index + 2; 
+
+				// Элементы для Email (Колонка E)
+                const emailIcon = isEmailActive ? '🟢' : '🔴';
+                const emailClass = isEmailActive ? 'active' : 'inactive';
+                
+                // Элементы для Push (Колонка F)
+                const pushIcon = isPushActive ? '🟢' : '🔴';
+                const pushClass = isPushActive ? 'active' : 'inactive';
+
+                html += `
+                     <tr class="row-${isEmailActive ? 'active' : 'inactive'}">
+                        <td>${row.user_a}</td>
+                        <!-- <td class="email-col">${row.email}</td> -->
+                        <td class="status-col">
+                            <span class="status-indicator status-${emailClass}" 
+                                  onclick="toggleEmailStatus(${sheetRow}, '${row.flag}', event)">
+                                ${emailIcon} ${isEmailActive ? 'Так' : 'Ні'}
+                            </span>
+                        </td>
+						<td class="status-col">
+                            <span class="status-indicator status-${pushClass}" 
+                                  onclick="togglePushStatus(${sheetRow}, '${row.flagP}', event)">
+                                 ${pushIcon} ${isPushActive ? 'Так' : 'Ні'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+            
+            // Добавляем минимальные стили для таблицы, если они не в style.css
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .config-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                }
+                .config-table th, .config-table td {
+                    padding: 10px 8px;
+                    border: 1px solid var(--table-border);
+                    text-align: left;
+                }
+                .config-table thead th {
+                    background-color: var(--table-th-bg);
+                    color: var(--text-color);
+                    text-align: center;
+                }
+                .config-table tbody tr:nth-child(even) {
+                    background-color: var(--table-row-alt);
+                }
+                .config-table tbody tr:hover {
+                    background-color: var(--table-hover);
+                }
+                .config-table .status-col {
+                    text-align: center;
+                    width: 25%;
+                }
+                .status-indicator {
+                    font-weight: bold;
+                    display: inline-block;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    cursor: pointer; /* Делаем элемент кликабельным */
+                    transition: background-color 0.2s;
+                }
+                .status-indicator:hover {
+                    filter: brightness(1.1);
+                }
+                .status-loading {
+                    pointer-events: none; /* Отключаем клики во время загрузки */
+                    opacity: 0.6;
+                }
+                .status-active {
+                    background-color: rgba(46, 125, 50, 0.2); /* Green tint */
+                    color: var(--status-success);
+                }
+                .status-inactive {
+                    background-color: rgba(198, 40, 40, 0.2); /* Red tint */
+                    color: var(--status-error);
+                }
+                .row-active {
+                    /* Подсветка активной строки */
+                    border-left: 4px solid var(--status-success);
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // --- Инициализация ---
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.classList.add('dark');
+            }
+            document.getElementById('buildVersion').textContent = getBuildVersion();
+            loadConfig();
+        });
+    </script>
+</body>
+</html>
