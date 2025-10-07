@@ -28,6 +28,7 @@
 		<li><a href="history.html">📜 Історія</a></li> 
 		<li><a href="stats.html">📈 Статистика</a></li>
 		<li><a href="#">⚙️ Налаштування</a></li>
+		<li><a href="#" onclick="closeWebView()">🚪 Вихід</a></li> 
 	  </ul>
 	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
 	</div>
@@ -303,6 +304,18 @@ function updatePortToggleUI(status) {
         // 4. УДАЛЕНА вся логика с win.open и win.close
       }
     });
+
+		/* --- ДОБАВЛЕНО: ФУНКЦИЯ ЗАКРЫТИЯ WEBVIEW --- */
+		function closeWebView() {
+			console.log("Attempting to close WebView...");
+			// Проверка наличия нативного Android-интерфейса
+			if (typeof Android !== 'undefined' && Android.closeApp) {
+				Android.closeApp();
+			} else {
+				// Fallback для обычного браузера
+				console.warn("Native Android closeApp interface not found. Cannot close application.");
+			}
+		}
   </script>
 </body>
 </html>
