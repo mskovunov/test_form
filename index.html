@@ -89,10 +89,10 @@
   <script>
   
   const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxiFpwrkbINal0wGhPxMy0wd452HF3Q64yPqXyntLG9HC7gIus6zY2hQoqrcWH_EROf/exec';		
-  //const BUILD_VERSION = 'v2025.10.07_01'; // <-- ДОБАВЛЕНО
+  const BUILD_VERSION = 'v2025.10.07.2159'; // <-- ДОБАВЛЕНО
 
-	 // --- ДОБАВЛЕНА ФУНКЦИЯ: Автоматическая генерация версии ---
-    function getBuildVersion() {
+	 // --- Удалена ФУНКЦИЯ: Автоматическая генерация версии ---
+    /*function getBuildVersion() {
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0'); // Месяц 01-12
@@ -100,7 +100,7 @@
 		const hours = String(now.getHours()).padStart(2, '0'); // Часы HH
         const minutes = String(now.getMinutes()).padStart(2, '0'); // Минуты MM
         return `v${year}.${month}.${day}.${hours}${minutes}`;
-    }
+    }*/
 	
     async function loadPreviousReading() {
       try {
@@ -210,7 +210,7 @@ function updatePortToggleUI(status) {
       if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark');
       }
-      document.getElementById('buildVersion').textContent = getBuildVersion(); // ИЗМЕНЕНИЕ на ф-ию
+      document.getElementById('buildVersion').textContent = BUILD_VERSION; 
     });
 
 		function toggleMenu() {

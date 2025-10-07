@@ -65,16 +65,6 @@
             menu.classList.toggle("open");
         }
 
-        function getBuildVersion() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            return `v${year}.${month}.${day}.${hours}${minutes}`; 
-        }
-
         function closeWebView() {
             console.log("Attempting to close WebView...");
             if (typeof Android !== 'undefined' && Android.closeApp) {
@@ -298,8 +288,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('theme') === 'dark') {
                 document.body.classList.add('dark');
-            }
-            document.getElementById('buildVersion').textContent = getBuildVersion();
+            }            
             loadConfig();
         });
     </script>
