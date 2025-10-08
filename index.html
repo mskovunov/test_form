@@ -37,7 +37,15 @@
     <h2>Форма для передачі показників лічильника</h2>
 
 <label>🔌 Статус порта зарядки: </label>
-<div class="port-status-block">
+<!-- ИЗМЕНЕНИЕ 1: Блок порта теперь является контейнером для загрузчика -->
+<div class="port-status-block"> 
+  
+  <!-- ДОБАВЛЕНИЕ 1: Элемент загрузки (отображается по умолчанию) -->
+  <div class="status-loader-wrapper" id="portLoader">
+      <div class="status-loader"></div>
+  </div>
+  <!-- КОНЕЦ ДОБАВЛЕНИЯ -->
+  
   <div class="port-status-content">
     <div class="port-indicator" id="portIndicator">
       <img src="img/Type_2_transp.png" alt="Type-2 порт" class="port-icon">
@@ -89,18 +97,8 @@
   <script>
   
   const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxiFpwrkbINal0wGhPxMy0wd452HF3Q64yPqXyntLG9HC7gIus6zY2hQoqrcWH_EROf/exec';		
-  const BUILD_VERSION = 'v2025.10.07.2159'; // <-- ДОБАВЛЕНО
+  const BUILD_VERSION = 'v2025.10.07.2159'; 
 
-	 // --- Удалена ФУНКЦИЯ: Автоматическая генерация версии ---
-    /*function getBuildVersion() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0'); // Месяц 01-12
-        const day = String(now.getDate()).padStart(2, '0');
-		const hours = String(now.getHours()).padStart(2, '0'); // Часы HH
-        const minutes = String(now.getMinutes()).padStart(2, '0'); // Минуты MM
-        return `v${year}.${month}.${day}.${hours}${minutes}`;
-    }*/
 	
     async function loadPreviousReading() {
       try {
@@ -132,8 +130,10 @@
       }
     }
 	
-/* --- ДОБАВЛЕНО: loadPortStatusFromSheet (для устранения ошибки на странице) --- */
+/* --- ДОБАВЛЕНО: loadPortStatusFromSheet (с управлением загрузчиком) --- */
     async function loadPortStatusFromSheet() {
+        const loader = document.getElementById('portLoader');
+        
         try {
             const resp = await fetch(WEBAPP_URL + '?getPortStatus=1');
             const status = (await resp.text()).trim(); 
@@ -141,10 +141,15 @@
             updatePortToggleUI(status);
         } catch (err) {
             console.error('Помилка при отриманні статусу порта:', err);
+            // Если GAS недоступен, используем значение из localStorage (по умолчанию 'available')
             const saved = localStorage.getItem("portStatus") || "available";
             updatePortToggleUI(saved);
+        } finally {
+            // ИЗМЕНЕНИЕ 2: Скрываем загрузчик после завершения операции
+            loader.classList.add('hidden');
         }
     }
+    /* --- КОНЕЦ ДОБАВЛЕНИЯ --- */
 
     function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
@@ -197,14 +202,12 @@ function updatePortToggleUI(status) {
       .catch(console.error);
     }
 
+	
+/* --- ИСПРАВЛЕННЫЙ И ОБЪЕДИНЕННЫЙ DOMContentLoaded --- */
     window.addEventListener('DOMContentLoaded', () => {
-	  // --- ИСПРАВЛЕНИЕ МЕРЦАНИЯ ---
-	  // 1. СИНХРОННО: Читаем последний сохраненный статус для немедленного отображения (устраняет мерцание)
-      const initialStatus = localStorage.getItem("portStatus") || "available";
-      updatePortToggleUI(initialStatus); 
-      
-	  // 2. АСИНХРОННО: Запрашиваем актуальный статус из GAS (он обновит UI через 1-2 сек)
-	  loadPortStatusFromSheet(); 
+	  
+	  // АСИНХРОННО: Запрашиваем актуальный статус из GAS 
+	  loadPortStatusFromSheet(); 
 	  
       loadPreviousReading();
       if (localStorage.getItem('theme') === 'dark') {

@@ -463,3 +463,44 @@ label {
     /* Максимальная ширина iframe ограничена контейнером */
     max-width: none; 
 }
+
+ /* ---------------------------------------------------- */
+    /* --- CSS ДЛЯ АНИМАЦИИ ЗАГРУЗКИ (Loader CSS) --- */
+    /* ---------------------------------------------------- */
+    .port-status-block {
+      position: relative;
+    }
+    
+    .status-loader-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 80px; /* Занимает высоту блока порта */
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        background-color: var(--input-bg, #fff); /* Фон, чтобы скрыть содержимое */
+        z-index: 10;
+        border-radius: 12px;
+    }
+
+    /* Анимация крутящегося колеса (Spinner) */
+    .status-loader {
+      border: 4px solid var(--input-border, #f3f3f3);
+      border-top: 4px solid var(--button-hover, #4a90e2); 
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Скрывает загрузчик после загрузки данных */
+    .status-loader-wrapper.hidden {
+        display: none;
+    }
