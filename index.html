@@ -107,9 +107,8 @@
   <script src="config.js"></script>
 	
   <script>
-  const BUILD_VERSION = 'v2025.10.13.1959'; 
+  const BUILD_VERSION = 'v2025.10.13.2159'; 
 
-    /* --- НОВАЯ ФУНКЦИЯ АККОРДЕОНА (ИЗ settings.html) --- */
     function toggleAccordion(contentId, buffer = 50) {
         const content = document.getElementById(contentId);
         const header = content.previousElementSibling; 
@@ -128,7 +127,6 @@
             icon.innerHTML = '▼';
         }
     }
-    /* --- КОНЕЦ НОВОЙ ФУНКЦИИ --- */
 
     // --- НОВАЯ ФУНКЦИЯ ДЛЯ ОБРАБОТКИ АККОРДЕОНА ИСТОРИИ ---
     async function toggleHistoryAccordion() {
