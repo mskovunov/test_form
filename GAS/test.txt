@@ -122,31 +122,46 @@ function doPost(e) {
                              .getSheetByName("Парковка");
 
   // VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-// --- ИЗМЕНЕНИЕ: ОБНОВЛЕНИЕ СТАТУСА КОНФИГА (ЧТЕНИЕ КОЛОНКИ) ---
+  // --- ОБЩИЙ БЛОК ОБНОВЛЕНИЯ КОНФИГА (ФЛАГИ ИЛИ EMAIL) ---
   if (e.parameter.updateConfig === '1') {
     try {
       const rowNum = parseInt(e.parameter.row);
-      const newStatus = e.parameter.status; // '1' или '0'
-      // НОВОЕ: Считываем номер колонки, которую нужно обновить (5 или 6)
-      const targetColumn = parseInt(e.parameter.column); 
-      
-      // Проверка на корректность входных данных
-      if (isNaN(rowNum) || rowNum < 2 || isNaN(targetColumn) || targetColumn < 5 || targetColumn > 6) {
-          return ContentService.createTextOutput("Error: Invalid input parameters").setMimeType(ContentService.MimeType.TEXT);
-      }
-      
+      const targetColumn = parseInt(e.parameter.column);
       const configSheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
                                        .getSheetByName("Config");
       
-      // Используем targetColumn для записи в колонку E (5) или F (6)
+      // 1. ОБНОВЛЕНИЕ EMAIL (Колонка 4 / D)
+      if (targetColumn === 4) {
+          const newEmail = e.parameter.email;
+          
+          // Проверка на корректность входных данных
+          if (isNaN(rowNum) || rowNum < 2 || !newEmail) {
+               // НОВОЕ СООБЩЕНИЕ: Указываем, какие параметры отсутствуют
+               return ContentService.createTextOutput("Error: Missing 'row' or 'email' parameter.").setMimeType(ContentService.MimeType.TEXT);
+          }
+          
+          // Записываем новое значение Email (строка)
+          configSheet.getRange(rowNum, 4).setValue(newEmail);
+          
+          return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+      }
+      
+      // 2. ОБНОВЛЕНИЕ ФЛАГОВ (Колонки 5 и 6 / E и F)
+      const newStatus = e.parameter.status; // '1' или '0'
+      
+      // Проверка на корректность входных данных для флагов
+      if (isNaN(rowNum) || rowNum < 2 || isNaN(targetColumn) || targetColumn < 5 || targetColumn > 6 || newStatus === undefined) {
+          return ContentService.createTextOutput("Error: Invalid input parameters for status update (row, column, or status missing).").setMimeType(ContentService.MimeType.TEXT);
+      }
+      
+      // Записываем новое значение статуса (целое число)
       configSheet.getRange(rowNum, targetColumn).setValue(parseInt(newStatus)); 
       
-      // Возвращаем успешный ответ
       return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
       
     } catch (error) {
       Logger.log("Error updating config status: " + error.toString());
-      return ContentService.createTextOutput("Error: Could not update config status").setMimeType(ContentService.MimeType.TEXT);
+      return ContentService.createTextOutput("Error: Could not update config status: " + error.toString()).setMimeType(ContentService.MimeType.TEXT);
     }
   }
   // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

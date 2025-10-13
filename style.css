@@ -666,3 +666,23 @@ label {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+		
+		 /* --- СТИЛИ ДЛЯ РЕДАКТИРУЕМОГО ПОЛЯ EMAIL --- */
+        .email-input {
+            width: 95%;
+            padding: 6px 8px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            box-sizing: border-box;
+            transition: border 0.3s;
+            margin: 0;
+            display: inline-block;
+        }
+        .email-input:focus {
+            border-color: var(--button-bg);
+            outline: none;
+        }
+

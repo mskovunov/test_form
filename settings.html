@@ -40,7 +40,7 @@
             <!-- АККОРДЕОН 1: Налаштування сповіщень користувачів -->
             <div class="accordion-item">
                 <div class="accordion-header" id="configHeader" onclick="toggleAccordion('configContent')">
-                    Налаштування сповіщень
+                    <span class="accordion-title">Налаштування сповіщень</span>
                     <span class="accordion-icon">▼</span>
                 </div>
                 <div class="accordion-content open" id="configContent">
@@ -56,7 +56,7 @@
             <!-- НОВЫЙ АККОРДЕОН 2: Email користувачів -->
             <div class="accordion-item">
                 <div class="accordion-header" onclick="toggleAccordion('emailContent')">
-                    Email користувачів
+                    <span class="accordion-title">Email користувачів</span>
                     <span class="accordion-icon">▼</span>
                 </div>
                 <!-- Убран класс 'open', чтобы блок был свернут по умолчанию -->
@@ -65,14 +65,17 @@
                         <!-- Сюда будет загружен список email'ов -->
                         <!-- Сообщение о загрузке будет отображено при инициализации в JS -->
                     </div>
+                    <!-- Контейнер для статуса аккордеона 2. Используем ID для ясности. -->
+                    <div id="emailStatus" class="status-message" style="text-align: center; margin-top: 20px; display: none;"></div>
                 </div>
             </div>
             <!-- КОНЕЦ АККОРДЕОНА 2 -->
             
-           </div>
+            <!-- Версия сборки -->
+            <p id="buildVersion" style="margin-top: 20px; font-size: 0.75rem; color: #999; text-align: center;"></p>
+            
+        </div>
     </div>
-
-
 
     <script>
         const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxiFpwrkbINal0wGhPxMy0wd452HF3Q64yPqXyntLG9HC7gIus6zY2hQoqrcWH_EROf/exec';
@@ -92,9 +95,12 @@
             const header = content.previousElementSibling; 
             const icon = header.querySelector('.accordion-icon');
             
+            // Если скрываем аккордеон, скрываем и его статус
             if (contentId === 'configContent' && content.classList.contains('open')) {
-                const statusDiv = document.getElementById('configStatus');
-                statusDiv.style.display = 'none';
+                document.getElementById('configStatus').style.display = 'none';
+            }
+            if (contentId === 'emailContent' && content.classList.contains('open')) {
+                document.getElementById('emailStatus').style.display = 'none';
             }
 
             content.classList.toggle('open');
@@ -126,13 +132,118 @@
         }
         
         
+        /* --- ФУНКЦИЯ: Сохранение email --- */
+             /* --- ФУНКЦИЯ: Сохранение email --- */
+        async function saveEmail(sheetRow, inputElement) {
+            const newEmail = inputElement.value.trim();
+            const statusDiv = document.getElementById('emailStatus');
+            const originalBorder = inputElement.style.borderColor;
+            
+            // Игнорируем, если email не изменился
+            if (newEmail === inputElement.dataset.originalEmail) {
+                return;
+            }
+
+            // НОВОЕ: Клиентская валидация email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(newEmail)) {
+                statusDiv.innerHTML = `<p style="color: var(--status-error);">⚠️ Невірний формат email адреси.</p>`;
+                statusDiv.style.display = 'block';
+                inputElement.style.border = '2px solid var(--status-error)';
+                
+                // Пересчитываем высоту, чтобы показать ошибку
+                const content = document.getElementById('emailContent');
+                if (content && content.classList.contains('open')) {
+                    content.style.maxHeight = (content.scrollHeight + 50) + "px"; 
+                }
+                
+                setTimeout(() => { 
+                    statusDiv.style.display = 'none'; 
+                    inputElement.style.borderColor = originalBorder;
+                }, 3000);
+                return; // Прерываем отправку запроса
+            }
+
+
+            // Визуальный индикатор загрузки
+            inputElement.style.border = '2px solid orange';
+            inputElement.disabled = true;
+
+            statusDiv.innerHTML = `<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Оновлення email для рядка ${sheetRow}...</span>`;
+            statusDiv.style.display = 'block';
+
+            // Принудительный перерасчет высоты аккордеона
+            const content = document.getElementById('emailContent');
+            if (content && content.classList.contains('open')) {
+                content.style.maxHeight = (content.scrollHeight + 50) + "px"; 
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('updateConfig', '1');
+                // ГАРАНТИРУЕМ, что row передается как строка
+                formData.append('row', String(sheetRow)); 
+                formData.append('email', newEmail); 
+                // ГАРАНТИРУЕМ, что column передается как строка
+                formData.append('column', '4'); // Колонка D (Email) имеет индекс 4 (A=1, B=2, C=3, D=4)
+
+                const resp = await fetch(WEBAPP_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const responseText = await resp.text();
+
+                if (responseText.includes('Success')) {
+                    statusDiv.innerHTML = `✅ Email оновлено успішно на: ${newEmail}`;
+                    inputElement.style.border = '2px solid var(--status-success)';
+                    inputElement.dataset.originalEmail = newEmail; // Обновляем оригинал
+                    
+                    await loadConfig(); 
+
+                } else {
+                    // Если ошибка от GAS, она будет отображена.
+                    throw new Error(responseText);
+                }
+
+            } catch (err) {
+                // Обработка ошибки, включая ошибку 'Invalid input parameters' от GAS
+                let errorMessage = err.message || 'Невідома помилка';
+                
+                if (errorMessage.includes("Error: Invalid input parameters")) {
+                    errorMessage = "Помилка: GAS не прийняв параметри. Перевірте GAS логіку або обов'язкові поля.";
+                } else if (errorMessage.includes("DOCTYPE")) {
+                    errorMessage = "Помилка зв'язку з GAS. Перевірте URL або дозволи.";
+                }
+                
+                statusDiv.innerHTML = `<p style="color: var(--status-error);">⚠️ Помилка оновлення email: ${errorMessage}</p>`;
+                inputElement.style.border = '2px solid var(--status-error)';
+                console.error('Помилка POST-запиту:', err);
+            }
+            
+            inputElement.disabled = false;
+
+            // Скрываем статус через короткое время
+            setTimeout(() => { 
+                statusDiv.style.display = 'none'; 
+                // Возвращаем исходный цвет рамки
+                inputElement.style.borderColor = originalBorder;
+                
+                // Обновляем высоту аккордеона
+                if (content && content.classList.contains('open')) {
+                    content.style.maxHeight = (content.scrollHeight + 50) + "px"; 
+                }
+            }, 3000);
+        }
+        
+        
         /* --- ФУНКЦИИ: Переключение статуса Email и PUSH --- */
         
-        // --- Общая функция для отправки запроса на обновление ---
+        // --- Общая функция для отправки запроса на обновление (для аккордеона 1) ---
         async function updateConfigStatus(sheetRow, currentFlag, targetColumn, event) {
             // targetColumn: 5 для Email (E) или 6 для PUSH (F)
             
-            // Предотвращаем обработку клика несколько раз
+            // ... (КОД АНАЛОГИЧЕН saveEmail, но использует статус-индикатор на кнопке) ...
             if (event.target.classList.contains('status-loading')) return;
 
             const statusDiv = document.getElementById('configStatus');
@@ -144,6 +255,7 @@
             indicator.innerHTML = '🔄';
             indicator.classList.add('status-loading');
             
+            // Выводим индикацию загрузки 
             statusDiv.innerHTML = `<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Оновлення статусу рядка ${sheetRow} у колонці ${targetColumn}...</span>`;
             statusDiv.style.display = 'block';
 
@@ -206,7 +318,7 @@
             await updateConfigStatus(sheetRow, currentFlag, 6, event);
         }
         
-        /* --- НОВАЯ ФУНКЦИЯ РЕНДЕРИНГА EMAIL-СПИСКА --- */
+        /* --- ФУНКЦИЯ РЕНДЕРИНГА EMAIL-СПИСКА (ДОБАВЛЕНО ПОЛЕ ВВОДА) --- */
         
         // Рендеринг таблицы email-адресов: использует user_a и email
         function renderEmailListTable(data, container) {
@@ -222,12 +334,21 @@
                     <tbody>
             `;
 
-            data.forEach((row) => {
-                // Используем данные из колонки B (user_a) и D (email)
+            data.forEach((row, index) => {
+                // Номер строки в Google Sheet: index + 2 (т.к. читаем с A2)
+                const sheetRow = index + 2; 
+
                 html += `
                     <tr>
                         <td>${row.user_a}</td>
-                        <td><a href="mailto:${row.email}" class="email-link">${row.email}</a></td>
+                        <td>
+                            <input type="email" 
+                                   class="email-input" 
+                                   value="${row.email}"
+                                   data-original-email="${row.email}"
+                                   onblur="saveEmail(${sheetRow}, this)"
+                                   onkeydown="if(event.key === 'Enter') { this.blur(); }">
+                        </td>
                     </tr>
                 `;
             });
@@ -242,15 +363,18 @@
             const configDiv = document.getElementById('configTableContainer');
             const emailListDiv = document.getElementById('emailListContainer');
             const statusDiv = document.getElementById('configStatus');
+            const emailStatusDiv = document.getElementById('emailStatus');
             
-            // Индикация загрузки для АККОРДЕОНА 1 (ВОССТАНОВЛЕНА С inline-spinner-wrapper)
+            // ... (КОД ЗАГРУЗКИ) ...
+            
+            // Индикация загрузки для АККОРДЕОНА 1 
             statusDiv.innerHTML = `<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Завантаження конфігурації...</span>`; 
             statusDiv.style.display = 'block';
 
-            // Индикация загрузки для АККОРДЕОНА 2 (ВОССТАНОВЛЕНА С inline-spinner-wrapper)
+            // Индикация загрузки для АККОРДЕОНА 2 
             emailListDiv.innerHTML = `
                 <p style="text-align: center; color: var(--text-color);">
-                    <span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Завантаження списку email'ів...</span>
+                    <span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Завантаження списку email...</span>
                 </p>`;
             
             // Аккордеон 1
@@ -276,7 +400,7 @@
 
                 if (!appData || appData.length === 0) {
                     configDiv.innerHTML = '<p>Конфігурація розсилки не знайдена або пуста.</p>';
-                    emailListDiv.innerHTML = '<p style="text-align: center;">Список email не знайдено.</p>';
+                    emailListDiv.innerHTML = '<p style="text-align: center;">Список email\'ів не знайдено.</p>';
                 } else {
                     // РЕНДЕРИНГ АККОРДЕОНА 1
                     renderConfigTable(appData, configDiv);
@@ -297,6 +421,9 @@
                 // Скрытие статуса после успешной загрузки
                 statusDiv.style.display = 'none';
 
+                // Сброс статуса email-аккордеона
+                emailStatusDiv.style.display = 'none';
+
             } catch (err) {
                 // В случае ошибки показываем статус внутри аккордеона 1
                 statusDiv.innerHTML = '<p style="color: var(--status-error);">⚠️ Помилка при завантаженні конфігурації. Перевірте ГАS.</p>';
@@ -304,7 +431,7 @@
                 console.error('Помилка конфігурації:', err);
                 
                 // Сброс лоадера для аккордеона 2
-                emailListDiv.innerHTML = '<p style="text-align: center; color: var(--status-error);">⚠️ Помилка завантаження списку email\'ів.</p>';
+                emailListDiv.innerHTML = '<p style="text-align: center; color: var(--status-error);">⚠️ Помилка завантаження списку email.</p>';
 
                 // Растягиваем аккордеоны, чтобы вместить сообщение об ошибке
                 if (contentConfig && contentConfig.classList.contains('open')) {
@@ -375,7 +502,6 @@
             if (localStorage.getItem('theme') === 'dark') {
                 document.body.classList.add('dark');
             }            
-			
             loadConfig(); 
         });
 
