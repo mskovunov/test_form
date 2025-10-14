@@ -208,7 +208,7 @@ if (e.parameter.portStatus !== undefined) {
             GmailApp.sendEmail(
                 recipient, // Получатель теперь может быть строкой из нескольких адресов через запятую
                 `СТАТУС : ${statusLabel}`,
-                `Порт зарядки на парковці був успішно змінено на : ${statusLabel}.`
+                `${formattedDateTime} - Порт зарядки на парковці був успішно змінено на : ${statusLabel}.`
             );
         } catch (error) {
             // Логирование ошибки отправки почты (не влияет на работу сайта)
