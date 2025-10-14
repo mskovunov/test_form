@@ -107,7 +107,7 @@
   <script src="config.js"></script>
 	
   <script>
-  const BUILD_VERSION = 'v2025.10.13.2159'; 
+  const BUILD_VERSION = 'v2025.10.14.1259'; 
 
     function toggleAccordion(contentId, buffer = 50) {
         const content = document.getElementById(contentId);
@@ -249,10 +249,10 @@ function updatePortToggleUI(status) {
       let notificationMessage;
       
       if (status === "busy") {
-          notificationTitle = "Статус порта: ЗАЙНЯТИЙ";
+          notificationTitle = "Статус: ЗАЙНЯТИЙ";
           notificationMessage = "Порт зарядки позначено як зайнятий.";
       } else {
-          notificationTitle = "Статус порта: ДОСТУПНИЙ";
+          notificationTitle = "Статус: ДОСТУПНИЙ";
           notificationMessage = "Порт зарядки знову доступний для використання!";
       }
 
@@ -295,7 +295,6 @@ function updatePortToggleUI(status) {
     const form = document.getElementById("meterForm");
     const status = document.getElementById("status");
 
-   /* --- ИСПРАВЛЕНИЕ: ПЕРЕПИСЫВАНИЕ ОБРАБОТЧИКА form.addEventListener (УДАЛЕН win.open) --- */
     form.addEventListener("submit", async function (e) {
       e.preventDefault();
 
