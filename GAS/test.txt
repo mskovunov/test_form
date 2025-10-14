@@ -172,13 +172,21 @@ if (e.parameter.portStatus !== undefined) {
     const value = e.parameter.portStatus === "1" ? 1 : 0;
     sheet.getRange("H1").setValue(value);
 
+    const now = new Date();
+    const formattedDateTime = Utilities.formatDate(
+        now, 
+        Session.getScriptTimeZone(), 
+        "dd.MM.yyyy HH:mm:ss" // Ваш желаемый формат
+    );
     const recipient = getRecipientList(); // Динамическое получение списка получателей
     const statusLabel = value === 1 ? "ЗАЙНЯТИЙ" : "ДОСТУПНИЙ";
 
     // 1)Отправка пуша в приложение (URL вашей развернутой Cloud Function)
     const functionUrl = 'https://send-port-notification-1048555343427.europe-west1.run.app';
     const payload = {
-        'status': statusLabel
+        'status': statusLabel,
+        // НОВОЕ: Добавляем форматированную дату в payload
+        'timestamp': formattedDateTime
     };
     const options = {
         'method': 'post',
