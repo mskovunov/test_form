@@ -93,7 +93,8 @@
     <script src="config.js"></script>    
 
     <script>
-	    const BUILD_VERSION = 'v2025.10.16.1659'; 
+	    const BUILD_VERSION = 'v2025.10.16.2359'; 
+		
         // --- Вспомогательные функции ---
         function toggleTheme() {
             const isDark = document.body.classList.toggle('dark');
@@ -222,15 +223,15 @@
                     // onAuthStateChanged сам обновит UI и перенаправит
                 } catch (error) {
                     let errorMessage = 'Помилка: ' + error.message;
-					// --- НОВІ ПЕРЕВІРКИ ДЛЯ КОДУ ПОМИЛКИ ---
-					if (error.code === 'auth/invalid-email') {
+					if (error.code === 'auth/missing-password') { // <--- ДОДАНО: Перевірка на пустий пароль
+						errorMessage = '⚠️ Будь ласка, введіть пароль.';
+					} else if (error.code === 'auth/invalid-email') {
 						errorMessage = '⚠️ Будь ласка, введіть коректний формат email (наприклад, user@domain.com).';
 					} else if (error.code === 'auth/weak-password') {
 						errorMessage = '⚠️ Пароль має бути не менше 6 символів.';
 					} else if (error.code === 'auth/email-already-in-use') {
 						errorMessage = '⚠️ Користувач з цією поштою вже існує.';
 					}
-					// --- КІНЕЦЬ НОВИХ ПЕРЕВІРОК ---
                     authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
                     console.error('Signup error:', error);
                 }
@@ -250,13 +251,13 @@
                     // onAuthStateChanged сам обновит UI и перенаправит
                 } catch (error) {
                     let errorMessage = 'Помилка: ' + error.message;
-					// --- НОВІ ПЕРЕВІРКИ ДЛЯ КОДУ ПОМИЛКИ ---
-					if (error.code === 'auth/invalid-email') {
-						errorMessage = '⚠️ Будь ласка, введіть коректний формат email.';
-					} else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-						errorMessage = '⚠️ Невірна пошта або пароль.';
-					}
-					// --- КІНЕЦЬ НОВИХ ПЕРЕВІРОК ---
+					if (error.code === 'auth/missing-password') { // <--- ДОДАНО: Перевірка на пустий пароль
+								errorMessage = '⚠️ Будь ласка, введіть пароль.';
+							} else if (error.code === 'auth/invalid-email') {
+								errorMessage = '⚠️ Будь ласка, введіть коректний формат email.';
+							} else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+								errorMessage = '⚠️ Невірна пошта або пароль.';
+							}
                     authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
                     console.error('Login error:', error);
                 }

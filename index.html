@@ -26,12 +26,15 @@
 		<path d="M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 	  </svg>
 	</button>
+	
+	<div id="user-info-header">
+        <span id="user-email-display" title="Ваша електронна пошта"></span>
+    </div>    
   <div class="form-wrapper">
-
 
 	<!-- Боковое меню -->
 	<div class="side-menu" id="sideMenu">
-	  <button class="close-button" onclick="toggleMenu()">❌</button>
+	  <button class="close-button" onclick="toggleMenu()">❌</button>	  	  
 	  <ul>
 		<li><a href="index.html">🏠 Головна</a></li> 
 		<li><a href="history.html">📜 Історія</a></li> 
@@ -41,7 +44,6 @@
 	  </ul>
 	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
 	</div>
-    
 
     <h2>Форма для передачі показників лічильника</h2>
 
@@ -114,7 +116,7 @@
   <script src="config.js"></script>
 	
   <script>
-  const BUILD_VERSION = 'v2025.10.16.1659'; 
+  const BUILD_VERSION = 'v2025.10.16.2359'; 
 
     function toggleAccordion(contentId, buffer = 50) {
         const content = document.getElementById(contentId);
@@ -406,7 +408,7 @@ function updatePortToggleUI(status) {
 			handleLogout(); 
 			
 			// 2. Если нужно закрыть приложение (как в вашем старом коде):
-			// closeWebView();
+		    closeWebView();
 		}
   </script>
   
@@ -428,6 +430,11 @@ function updatePortToggleUI(status) {
             console.log("Пользователь авторизован как:", user.email);
             // Здесь можно выполнять код для авторизованных пользователей (например, загрузку данных из Firestore)
         }
+		// НОВОЕ: Отображение email пользователя
+            const userEmailDisplay = document.getElementById('user-email-display');
+            if (userEmailDisplay && user.email) {
+                userEmailDisplay.textContent = user.email;
+            }
     });
 
     // // (Ваш существующий код для загрузки данных из GAS должен быть ниже этого блока)

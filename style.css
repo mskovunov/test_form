@@ -42,6 +42,7 @@ body {
 }
 
 .container {
+  position: relative;
   background-color: var(--input-bg);
   padding: 25px 20px;
   border-radius: 12px;
@@ -362,6 +363,25 @@ label {
   transform: scale(1.2);
 }
 
+/* --- ДОБАВЛЕННЫЕ СТИЛИ: Позиционирование email-адреса --- */
+#user-info-header {
+    position: absolute;
+    top: 48px;      /* Выравнивание по верхнему краю с кнопкой меню */
+    right: 48px;    /* Выравнивание по правому краю контейнера */
+    font-size: 0.75rem; 
+    color: var(--text-color-secondary, #999);
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis; 
+    max-width: 60%; /* Ограничиваем ширину, чтобы email не перекрывал заголовок */
+    z-index: 10; /* Убеждаемся, что он находится поверх других элементов */
+}
+
+#user-email-display {
+    font-weight: bold;
+    color: var(--text-color, #fff); 
+}
+
 /* Сайд-меню */
 .side-menu {
   position: absolute;
@@ -427,6 +447,7 @@ label {
   overflow: hidden; /* важно, чтобы меню не вылезало за пределы формы */
   min-height: 80vh;
 }
+
 
 /* Правила для меню внутри form-wrapper */
 .form-wrapper .side-menu {
@@ -734,3 +755,4 @@ label {
 			background-color: #f1f1f1 !important;
 			box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 		}
+		
