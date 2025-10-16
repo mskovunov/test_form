@@ -47,14 +47,27 @@
                 <div id="auth-form-content" style="display: none;">
                     
                     <label for="email-input">Електронна пошта:</label>
-                    <input type="email" id="email-input" placeholder="example@domain.com" class="input-field">
+                    <input type="email" id="email-input" placeholder="example@domain.com">
                     
                     <label for="password-input" style="margin-top: 15px; display: block;">Пароль:</label>
-                    <input type="password" id="password-input" placeholder="********" class="input-field">
+                    <input type="password" id="password-input" placeholder="********">
                     
                     <div style="margin-top: 25px;">
                         <button id="login-button" class="action-button primary-button">Увійти</button>
                         <button id="signup-button" class="action-button primary-button" style=>Зареєструватися</button>
+                    </div>
+					
+					<div style="margin-top: 20px;">
+                        <button id="google-login-button" class="action-button google-button">
+                            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; margin-right: 10px; vertical-align: middle;">
+                                <path fill="#4285F4" d="M22.01 12.01c0-.7-.06-1.37-.16-2.01H12v3.78h5.38c-.23 1.15-.9 2.14-1.92 2.82v2.46h3.17c1.86-1.72 2.98-4.25 2.98-7.05z"/>
+                                <path fill="#34A853" d="M12 22c3.2 0 5.86-1.07 7.82-2.91l-3.17-2.46c-1.04.7-2.38 1.12-3.65 1.12-2.7 0-5-1.81-5.83-4.24H3.06v2.54c1.9 3.8 5.7 6.65 8.94 6.65z"/>
+                                <path fill="#FBBC05" d="M6.17 14.15c-.24-.7-.38-1.44-.38-2.15s.14-1.45.38-2.15V7.46H3.06c-.84 1.68-1.32 3.61-1.32 5.54s.48 3.86 1.32 5.54L6.17 14.15z"/>
+                                <path fill="#EA4335" d="M12 5.86c1.87 0 3.52.65 4.8 1.83l2.81-2.81C17.8 2.5 15.2 1.5 12 1.5c-3.2 0-7.01 2.85-8.91 6.66L6.17 9.85C7 7.42 9.3 5.86 12 5.86z"/>
+                                <path fill="none" d="M0 0h24v24H0z"/>
+                            </svg>
+                            Увійти через Google
+                        </button>
                     </div>
                     
                     <div id="auth-status" class="status-message" style="margin-top: 20px; display: none;"></div>
@@ -80,6 +93,7 @@
     <script src="config.js"></script>    
 
     <script>
+	    const BUILD_VERSION = 'v2025.10.16.1659'; 
         // --- Вспомогательные функции ---
         function toggleTheme() {
             const isDark = document.body.classList.toggle('dark');
@@ -153,7 +167,9 @@
                  document.getElementById('loading-status').innerHTML = '<p style="color: var(--status-error);">❌ Помилка: Firebase не підключений.</p>';
                  return;
             }
-
+			// ⚠️ НОВЕ: Отримання елемента кнопки Google
+            const googleLoginButton = document.getElementById('google-login-button');
+			
             // Получаем элементы DOM
             const formContent = document.getElementById('auth-form-content');
             const loggedInMessage = document.getElementById('logged-in-message');
@@ -206,11 +222,15 @@
                     // onAuthStateChanged сам обновит UI и перенаправит
                 } catch (error) {
                     let errorMessage = 'Помилка: ' + error.message;
-                    if (error.code === 'auth/weak-password') {
-                        errorMessage = '⚠️ Пароль має бути не менше 6 символів.';
-                    } else if (error.code === 'auth/email-already-in-use') {
-                        errorMessage = '⚠️ Користувач з цією поштою вже існує.';
-                    }
+					// --- НОВІ ПЕРЕВІРКИ ДЛЯ КОДУ ПОМИЛКИ ---
+					if (error.code === 'auth/invalid-email') {
+						errorMessage = '⚠️ Будь ласка, введіть коректний формат email (наприклад, user@domain.com).';
+					} else if (error.code === 'auth/weak-password') {
+						errorMessage = '⚠️ Пароль має бути не менше 6 символів.';
+					} else if (error.code === 'auth/email-already-in-use') {
+						errorMessage = '⚠️ Користувач з цією поштою вже існує.';
+					}
+					// --- КІНЕЦЬ НОВИХ ПЕРЕВІРОК ---
                     authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
                     console.error('Signup error:', error);
                 }
@@ -230,9 +250,13 @@
                     // onAuthStateChanged сам обновит UI и перенаправит
                 } catch (error) {
                     let errorMessage = 'Помилка: ' + error.message;
-                    if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-                        errorMessage = '⚠️ Невірна пошта або пароль.';
-                    }
+					// --- НОВІ ПЕРЕВІРКИ ДЛЯ КОДУ ПОМИЛКИ ---
+					if (error.code === 'auth/invalid-email') {
+						errorMessage = '⚠️ Будь ласка, введіть коректний формат email.';
+					} else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+						errorMessage = '⚠️ Невірна пошта або пароль.';
+					}
+					// --- КІНЕЦЬ НОВИХ ПЕРЕВІРОК ---
                     authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
                     console.error('Login error:', error);
                 }
@@ -240,6 +264,41 @@
             
             // 4. Обработчик кнопки "Вийти" внутри logged-in-message
             logoutButton.addEventListener('click', handleLogout);
+			
+			// ⚠️ НОВЕ: Логіка входу через Google
+            googleLoginButton.addEventListener('click', async () => {
+                
+                authStatus.style.display = 'block';
+                authStatus.innerHTML = '<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Вхід через Google...</span>';
+                
+                // Створення об'єкта провайдера Google (потрібна сумісність)
+                const provider = new firebase.auth.GoogleAuthProvider();
+
+                try {
+                    // Виклик спливаючого вікна для входу
+                    const userCredential = await auth.signInWithPopup(provider);
+                    
+                    // Успішний вхід. Викликаємо функцію для запису/оновлення даних
+                    await saveUserData(userCredential.user);
+                    
+                    // onAuthStateChanged сам оновиться і перенаправить
+                } catch (error) {
+                    let errorMessage = 'Помилка входу через Google.';
+
+                    if (error.code === 'auth/popup-closed-by-user') {
+                        errorMessage = '⚠️ Вікно авторизації було закрито користувачем.';
+                    } else if (error.code === 'auth/cancelled-popup-request') {
+                        errorMessage = '⚠️ Запит на вхід було скасовано.';
+                    } else {
+                        errorMessage = `Помилка: ${error.message}`;
+                    }
+
+                    authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
+                    console.error('Google Login error:', error);
+                }
+            });
+			
+		  document.getElementById('buildVersion').textContent = BUILD_VERSION; 	
         });
 
     </script>

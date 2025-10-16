@@ -69,6 +69,8 @@ label {
 
 input[type="text"],
 input[type="number"],
+input[type="email"],
+input[type="password"],
 select {
   width: 100%;
   padding: 12px 14px;
@@ -718,3 +720,17 @@ label {
             outline: none;
         }
 
+		/* --- СТИЛЬ КНОПКИ GOOGLE --- */
+		.google-button {
+			width: 100%;
+			/* Перезаписываем стили action-button, если они есть */
+			background-color: white !important;
+			color: #4285F4 !important; /* Фирменный синий Google */
+			border: 1px solid #ddd;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+
+		.google-button:hover {
+			background-color: #f1f1f1 !important;
+			box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+		}
