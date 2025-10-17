@@ -446,27 +446,9 @@ function updatePortToggleUI(status) {
 	<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>	
 	<script src="./firebase-init.js"></script>
 	
-	<script>
-	// Проверка статуса авторизации при загрузке страницы
-    auth.onAuthStateChanged((user) => {
-        if (!user) {
-            // Если пользователь НЕ авторизован
-            console.log("Пользователь не авторизован. Перенаправление на страницу входа.");
-            // Перенаправить на страницу входа
-            window.location.replace('auth.html'); 
-        } else {
-            // Пользователь авторизован
-            console.log("Пользователь авторизован как:", user.email);
-            
-            // НОВОЕ: Загрузка и отображение username
-            loadUsername(user);
-        }
-    });
-
-    // // (Ваш существующий код для загрузки данных из GAS должен быть ниже этого блока)
-</script>
-
+	
 </body>
 </html>
+
 
 
