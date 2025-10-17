@@ -756,3 +756,85 @@ label {
 			box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 		}
 		
+
+/* --- СТИЛИ ДЛЯ ЗАКЛАДОК (ТАБОВ) --- */
+.tabs {
+    margin-top: 25px;
+    border: none;
+    box-shadow: none;
+    background-color: transparent; /* Убираем фон, чтобы не конфликтовал с контейнером */
+}
+
+.tab-buttons {
+    display: flex;
+    justify-content: space-around;
+    padding: 0; 
+    
+    /* Отступ между кнопками, который выглядит как разделитель */
+    gap: 8px; 
+    
+    margin-bottom: 8px; /* Минимальный отступ от контента */
+    background-color: transparent; 
+    border-bottom: none;
+}
+
+.tab-button {
+    flex-grow: 1;
+    padding: 12px 10px; 
+    
+    /* НЕАКТИВНОЕ СОСТОЯНИЕ */
+    border: 1px solid var(--input-border); /* Четкий контур */
+    background-color: var(--table-th-bg); /* Светлый фон для контраста */
+    border-radius: 8px; /* Округлые углы */
+    
+    cursor: pointer;
+    font-size: 1.05rem; 
+    color: var(--text-color-secondary); 
+    transition: all 0.3s ease-in-out, box-shadow 0.3s; 
+    outline: none;
+    position: relative;
+    overflow: hidden;
+    font-weight: 500; 
+}
+
+.tab-button:hover {
+    background-color: var(--table-hover);
+    color: var(--text-color);
+}
+
+.tab-button.active {
+    /* АКТИВНОЕ СОСТОЯНИЕ */
+    color: var(--button-bg); 
+    font-weight: bold;
+    background-color: var(--input-bg);
+    border-color: var(--button-bg); /* Контрастная рамка */
+    box-shadow: 0 0 10px rgba(52, 144, 226, 0.3); /* Яркая тень */
+    z-index: 2; 
+}
+
+/* Удаляем подчеркивание снизу, так как оно не нужно для этого стиля */
+.tab-button::before,
+.tab-button.active::before { 
+    content: none;
+}
+
+/* Стили для содержимого вкладок */
+.tab-content {
+    display: none;
+    padding: 20px;
+    
+    /* Контур вокруг всего блока контента */
+    border: 1px solid var(--input-border); 
+    
+    /* Округление всего блока контента */
+    border-radius: 8px; 
+    
+    /* УДАЛЕНО: margin-top: -15px; - это устраняет проблему срезанных углов */
+    margin-top: 0; 
+    
+    background-color: var(--input-bg);
+}
+
+.tab-content.active {
+    display: block;
+}

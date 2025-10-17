@@ -116,7 +116,7 @@
   <script src="config.js"></script>
 	
   <script>
-  const BUILD_VERSION = 'v2025.10.16.2359'; 
+  //const BUILD_VERSION = 'v2025.10.16.2359'; 
 
     function toggleAccordion(contentId, buffer = 50) {
         const content = document.getElementById(contentId);
@@ -410,6 +410,35 @@ function updatePortToggleUI(status) {
 			// 2. Если нужно закрыть приложение (как в вашем старом коде):
 		    closeWebView();
 		}
+		
+		// --- НОВАЯ ФУНКЦИЯ: Загрузка Username из Firestore ---
+		async function loadUsername(user) {
+            if (!user) return;
+            const displayElement = document.getElementById('user-email-display');
+            
+            if (typeof db === 'undefined') {
+                console.error("Firestore не инициализирован. Не могу загрузить username.");
+                return; // Оставляем пустым
+            }
+            
+            const userRef = db.collection('users').doc(user.uid);
+            
+            // УДАЛЕНО: Показываем Email по умолчанию, пока идет запрос
+
+            userRef.get().then((doc) => {
+                if (doc.exists && doc.data().username) {
+                    // Если username найден в Firestore, используем его
+                    displayElement.textContent = doc.data().username;
+                } else {
+                    // Username не найден или данные неполны, оставляем пустым.
+                    console.warn("Username не найден в Firestore. Оставляем поле пустым.");
+                }
+            }).catch((error) => {
+                console.error("Ошибка при получении username из Firestore:", error);
+                // Оставляем пустым
+            });
+        }
+		
   </script>
   
 	<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -418,7 +447,7 @@ function updatePortToggleUI(status) {
 	<script src="./firebase-init.js"></script>
 	
 	<script>
-    // Проверка статуса авторизации при загрузке страницы
+	// Проверка статуса авторизации при загрузке страницы
     auth.onAuthStateChanged((user) => {
         if (!user) {
             // Если пользователь НЕ авторизован
@@ -428,13 +457,10 @@ function updatePortToggleUI(status) {
         } else {
             // Пользователь авторизован
             console.log("Пользователь авторизован как:", user.email);
-            // Здесь можно выполнять код для авторизованных пользователей (например, загрузку данных из Firestore)
+            
+            // НОВОЕ: Загрузка и отображение username
+            loadUsername(user);
         }
-		// НОВОЕ: Отображение email пользователя
-            const userEmailDisplay = document.getElementById('user-email-display');
-            if (userEmailDisplay && user.email) {
-                userEmailDisplay.textContent = user.email;
-            }
     });
 
     // // (Ваш существующий код для загрузки данных из GAS должен быть ниже этого блока)
