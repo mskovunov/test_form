@@ -363,23 +363,79 @@ label {
   transform: scale(1.2);
 }
 
-/* --- ДОБАВЛЕННЫЕ СТИЛИ: Позиционирование email-адреса --- */
+/* --- СТИЛИ ДЛЯ ВЫДЕЛЕНИЯ БЛОКА ЛОГИНА (USERNAME) --- */
 #user-info-header {
+    /* Position relative to the container which has padding: 25px 20px; */
     position: absolute;
-    top: 48px;      /* Выравнивание по верхнему краю с кнопкой меню */
-    right: 48px;    /* Выравнивание по правому краю контейнера */
-    font-size: 0.75rem; 
-    color: var(--text-color-secondary, #999);
-    white-space: nowrap; 
+    top: 25px; /* Отступ сверху, чтобы не конфликтовать с кнопкой меню */
+    right: 25px; /* Отступ справа */
+    
+    /* Используем Flexbox для размещения логина и кнопки в один ряд */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Промежуток между логином и кнопкой */
+
+    /* Визуальное выделение (сохраняем, но убираем border и padding на контейнере) */
+    background-color: transparent; 
+    padding: 0; 
+    border-radius: 0; 
+    border: none;
+    box-shadow: none;
+    
+    /* Сохранение существующих правил */
+    font-size: 0.85rem; 
+    color: var(--text-color-secondary); 
+    max-width: 55%; 
+    z-index: 10; 
+    cursor: default;
+}
+
+#user-info-wrapper {
+    /* Карточка теперь вокруг username для лучшего визуального эффекта */
+    background-color: var(--input-bg);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--button-bg);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    
+    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; 
-    max-width: 60%; /* Ограничиваем ширину, чтобы email не перекрывал заголовок */
-    z-index: 10; /* Убеждаемся, что он находится поверх других элементов */
+    text-overflow: ellipsis;
 }
 
 #user-email-display {
     font-weight: bold;
-    color: var(--text-color, #fff); 
+    color: var(--button-bg); /* Акцентный цвет */
+    display: block;
+}
+
+/* --- НОВЫЙ СТИЛЬ: КНОПКА ВЫХОДА (Иконка) --- */
+#logout-inline-button {
+    /* Сбрасываем стили основной кнопки */
+    background: none;
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%; /* Круглая форма */
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s, transform 0.2s;
+    margin-top: 0;
+    flex-shrink: 0; /* Чтобы не сжималась */
+}
+
+#logout-inline-button svg {
+    color: var(--status-error); /* Красный цвет для иконки выхода */
+    width: 18px;
+    height: 18px;
+}
+
+#logout-inline-button:hover {
+    background-color: var(--table-hover); /* Светлый фон при наведении */
+    transform: scale(1.1);
 }
 
 /* Сайд-меню */
