@@ -259,6 +259,11 @@ function updatePortToggleUI(status) {
       const isBusy = document.getElementById("portToggle").checked;
       const status = isBusy ? "busy" : "available";
       const statusValue = isBusy ? "1" : "0";
+	  // ИСПРАВЛЕНО: Получаем текущего пользователя здесь, чтобы избежать ошибки ReferenceError
+      const user = firebase.auth().currentUser; // Получаем текущего пользователя Firebase
+    
+      // Используем username, если он отображается в заголовке, или пусто
+      const username = document.getElementById('user-email-display').textContent || '';	  
 	  
 	  if (typeof GoogleAnalytics !== 'undefined') {
         const eventName = isBusy ? 'port_set_busy' : 'port_set_available';
@@ -267,8 +272,13 @@ function updatePortToggleUI(status) {
 	
       localStorage.setItem("portStatus", status);
       updatePortToggleUI(status);
+	  // 1. ДОБАВЛЕНО: Логирование в Firestore
+		if (user) {
+			// Мы вызываем асинхронную функцию, но не ждем ее, чтобы не задерживать UI
+			logPortStatusChange(user, status, username);
+		}
 
-// --- ДОБАВЛЕН ВЫЗОВ УВЕДОМЛЕНИЯ ANDROID ---
+	  // 2. ДОБАВЛЕН ВЫЗОВ УВЕДОМЛЕНИЯ ANDROID
       let notificationTitle;
       let notificationMessage;
       
@@ -284,8 +294,7 @@ function updatePortToggleUI(status) {
           // Вызываем нативный метод, который покажет системное уведомление
           AndroidNotifier.showNotification(notificationTitle, notificationMessage);
       }
-      // ------------------------------------------
-
+	  // 3. Отправка данных в Google Apps Script (GAS)
       fetch(WEBAPP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -457,6 +466,40 @@ function updatePortToggleUI(status) {
                 // Оставляем пустым
             });
         }
+		
+		// --- НОВАЯ ФУНКЦИЯ: Логирование статуса порта в Firestore ---
+	async function logPortStatusChange(user, newStatus, username) {
+    if (!user || typeof db === 'undefined') {
+        console.warn("Firestore або користувач не ініціалізовані. Логування неможливе.");
+        return;
+    }
+
+    // Форматирование времени в dd.MM.yyyy HH:mm:ss
+    const now = new Date();
+    const dateTimeString = now.toLocaleDateString('uk-UA', { 
+        day: '2-digit', month: '2-digit', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit', 
+        hour12: false 
+    }).replace(',', ''); // Удаляем запятую, если она есть в локальном формате
+
+    try {
+        const logData = {
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(), // Время на сервере
+            localTime: dateTimeString, // Время в нужном формате
+            userId: user.uid,
+            username: username || user.email, // Используем username или email как запасной вариант
+            status: newStatus, // "busy" или "available"
+            statusUA: (newStatus === "busy" ? "Зайнятий" : "Доступний")
+        };
+
+        // Запись в коллекцию 'port_logs'
+        await db.collection('port_logs').add(logData);
+        console.log("Лог статуса порта успешно записан в Firestore:", logData);
+
+    } catch (error) {
+        console.error("Ошибка при записи лога порта в Firestore:", error);
+    }
+}
 		
   </script>
   

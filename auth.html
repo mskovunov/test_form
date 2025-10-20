@@ -53,16 +53,25 @@
                         </div>
                         
                         <div id="login-tab-content" class="tab-content active">
-                            
+                          <form id="login-form"> 
                             <label for="username-login-input">Користувач:</label>
                             <input type="text" id="username-login-input" placeholder="Ваш логін" autocomplete="username">
                             
-                            <label for="password-input" style="margin-top: 15px; display: block;">Пароль:</label>
-                            <input type="password" id="password-input" placeholder="********" autocomplete="current-password">
+							<label for="password-input" style="margin-top: 15px; display: block;">Пароль:</label>
+							<div class="password-input-wrapper">
+								<input type="password" id="password-input" placeholder="********" autocomplete="current-password">
+								<span class="toggle-password" data-target="password-input">
+									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye-off">
+										<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-4.48 0-8.21-3.2-9.67-8.12M4.24 4.24A10.07 10.07 0 0 1 12 4c4.48 0 8.21 3.2 9.67 8.12"></path>
+										<line x1="1" y1="1" x2="23" y2="23"></line>
+									</svg>
+								</span>
+							</div>
                             
                             <div style="margin-top: 25px;">
                                 <button id="login-button" class="action-button primary-button">Увійти</button>
                             </div>
+						  </form>
                             
                             <div style="margin-top: 20px;">
                                 <button id="google-login-button" class="action-button google-button">
@@ -79,7 +88,7 @@
                         </div>
                         
                         <div id="signup-tab-content" class="tab-content">
-                            
+                          <form id="signup-form">  
                             <label for="signup-email-input">Електронна пошта:</label>
                             <input type="email" id="signup-email-input" placeholder="example@domain.com" autocomplete="email">
                             
@@ -87,11 +96,20 @@
                             <input type="text" id="signup-username-input" placeholder="Ваш логін" autocomplete="username">
                             
                             <label for="signup-password-input" style="margin-top: 15px; display: block;">Пароль:</label>
-                            <input type="password" id="signup-password-input" placeholder="********" autocomplete="new-password">
+							<div class="password-input-wrapper">
+								<input type="password" id="signup-password-input" placeholder="********" autocomplete="new-password">
+								<span class="toggle-password" data-target="signup-password-input">
+									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye-off">
+										<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-4.48 0-8.21-3.2-9.67-8.12M4.24 4.24A10.07 10.07 0 0 1 12 4c4.48 0 8.21 3.2 9.67 8.12"></path>
+										<line x1="1" y1="1" x2="23" y2="23"></line>
+									</svg>
+								</span>
+							</div>
                             
                             <div style="margin-top: 25px;">
                                 <button id="signup-button" class="action-button primary-button">Зареєструватися</button>
                             </div>
+						  </form>
                         </div>
 
                     </div>
@@ -176,6 +194,22 @@
             
             document.getElementById('auth-status').style.display = 'none';
         }
+		
+		function togglePasswordVisibility(targetId, toggleElement) {
+			const input = document.getElementById(targetId);
+			
+			// Переключаем атрибут type
+			if (input.type === 'password') {
+				input.type = 'text';
+				// Иконка: Глаз открыт
+				toggleElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+			} else {
+				input.type = 'password';
+				// Иконка: Глаз закрыт
+				toggleElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye-off"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-4.48 0-8.21-3.2-9.67-8.12M4.24 4.24A10.07 10.07 0 0 1 12 4c4.48 0 8.21 3.2 9.67 8.12"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+			}
+		}
+
 
         /* --- НОВЫЕ ФУНКЦИИ ДЛЯ USERNAME/EMAIL В FIRESTORE --- */
 
@@ -239,12 +273,13 @@
             const userEmailDisplay = document.getElementById('user-email-display');
             
             // Элементы ВХОДА
+			const loginForm = document.getElementById('login-form'); // <--- НОВЫЙ ЭЛЕМЕНТ
             const usernameLoginInput = document.getElementById('username-login-input'); 
             const passwordInput = document.getElementById('password-input');
-            const loginButton = document.getElementById('login-button');
             const googleLoginButton = document.getElementById('google-login-button');
             
             // Элементы РЕГИСТРАЦИИ
+			const signupForm = document.getElementById('signup-form'); // <--- ДОБАВЛЕНО
             const signupEmailInput = document.getElementById('signup-email-input');
             const signupUsernameInput = document.getElementById('signup-username-input'); 
             const signupPasswordInput = document.getElementById('signup-password-input');
@@ -280,7 +315,8 @@
             });
 
             // 2. Обработчик регистрации (Email + Username + Пароль)
-            signupButton.addEventListener('click', async () => {
+            signupForm.addEventListener('submit', async (e) => { // <--- ИЗМЕНЕНО: Обработчик SUBMIT на ФОРМЕ
+			e.preventDefault(); // <--- ВАЖНО: Останавливаем перезагрузку страницы
                 const email = signupEmailInput.value; 
                 const username = signupUsernameInput.value; 
                 const password = signupPasswordInput.value;
@@ -327,39 +363,42 @@
             });
 
             // 3. Обработчик входа (Username + Пароль)
-            loginButton.addEventListener('click', async () => {
-                const username = usernameLoginInput.value; 
-                const password = passwordInput.value;
+			loginForm.addEventListener('submit', async (e) => { // <-- ИЗМЕНЕНО: Обработчик SUBMIT на ФОРМЕ
+				// ВАЖНО: Останавливаем стандартную отправку формы (перезагрузку страницы)
+				e.preventDefault(); 
+				
+				const username = usernameLoginInput.value; 
+				const password = passwordInput.value;
 
-                authStatus.style.display = 'block';
-                authStatus.innerHTML = '<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Вхід...</span>';
+				authStatus.style.display = 'block';
+				authStatus.innerHTML = '<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Вхід...</span>';
 
-                try {
-                    const email = await findEmailByUsername(username);
+				try {
+					const email = await findEmailByUsername(username);
 
-                    if (!email) {
-                        throw { code: 'auth/user-not-found', message: 'Користувач не знайдений' };
-                    }
-                    
-                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                    
-                    await saveUserData(userCredential.user, username); 
+					if (!email) {
+						throw { code: 'auth/user-not-found', message: 'Користувач не знайдений' };
+					}
+					
+					const userCredential = await auth.signInWithEmailAndPassword(email, password);
+					
+					await saveUserData(userCredential.user, username); 
 
-                } catch (error) {
-                    let errorMessage = 'Помилка: ' + error.message;
-                    
-                    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || errorMessage.includes('Користувач не знайдений')) {
-                        errorMessage = '⚠️ Невірний логін або пароль.';
-                    } else if (error.code === 'auth/missing-password') { 
-                        errorMessage = '⚠️ Будь ласка, введіть пароль.';
-                    } else if (error.code === 'permission-denied') { // Явная обработка ошибки прав
-                        errorMessage = '⚠️ Помилка доступу до бази даних. Перевірте Правила Firebase Firestore.';
-                    }
-                    
-                    authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
-                    console.error('Login error:', error);
-                }
-            });
+				} catch (error) {
+					let errorMessage = 'Помилка: ' + error.message;
+					
+					if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || errorMessage.includes('Користувач не знайдений')) {
+						errorMessage = '⚠️ Невірний логін або пароль.';
+					} else if (error.code === 'auth/missing-password') { 
+						errorMessage = '⚠️ Будь ласка, введіть пароль.';
+					} else if (error.code === 'permission-denied') {
+						errorMessage = '⚠️ Помилка доступу до бази даних. Перевірте Правила Firebase Firestore.';
+					}
+					
+					authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
+					console.error('Login error:', error);
+				}
+			});
             
             // 4. Обработчик кнопки "Вийти"
             logoutButton.addEventListener('click', handleLogout);
@@ -389,12 +428,21 @@
                     }
 
                     authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
-                    console.error('Google Login error:', error);
-                }
+                    console.error('Google Login error:', error);              
+				}
             });
 			
-		  document.getElementById('buildVersion').textContent = BUILD_VERSION; 	
-        });
+			// 6. Обработчик для кнопок показа/скрытия пароля
+			document.querySelectorAll('.toggle-password').forEach(toggle => {
+				toggle.addEventListener('click', function() {
+					const targetId = this.dataset.target;
+					togglePasswordVisibility(targetId, this);
+				});
+			});
+			
+		    document.getElementById('buildVersion').textContent = BUILD_VERSION; 	
+		});
+		
 
     </script>
 </body>

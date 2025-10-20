@@ -894,3 +894,36 @@ label {
 .tab-content.active {
     display: block;
 }
+
+/* --- СТИЛИ ДЛЯ ПОКАЗА/СКРЫТИЯ ПАРОЛЯ --- */
+
+.password-input-wrapper {
+    position: relative; /* Контейнер для абсолютного позиционирования кнопки */
+    /* Убираем глобальный margin-top, чтобы его задавала label */
+}
+
+/* Стилизуем input внутри wrapper'а */
+.password-input-wrapper input[type="password"],
+.password-input-wrapper input[type="text"] {
+    /* Удаляем margin-top, который задан глобально, чтобы input был вплотную к label */
+    margin-top: 5px; 
+    /* Добавляем padding справа, чтобы текст не заходил под кнопку */
+    padding-right: 40px; 
+}
+
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    /* 20px - это половина padding-right + небольшой отступ */
+    right: 10px; 
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--text-color-secondary);
+    padding: 5px;
+    line-height: 0; /* Убираем лишний вертикальный отступ */
+    z-index: 5;
+}
+
+.toggle-password:hover {
+    color: var(--text-color);
+}
