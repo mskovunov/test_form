@@ -342,8 +342,8 @@ label {
 
 .menu-button {
   
-  top: 12px;           /* отступ сверху */
-  left: 12px;          /* или right: 12px; если нужно справа */
+  top: 15px;           /* отступ сверху */
+  left: 15px;          /* или right: 12px; если нужно справа */
   width: 36px;         /* фиксированный размер */
   height: 36px;
   font-size: 1.4rem;
@@ -367,7 +367,7 @@ label {
 #user-info-header {
     /* Position relative to the container which has padding: 25px 20px; */
     position: absolute;
-    top: 25px; /* Отступ сверху, чтобы не конфликтовать с кнопкой меню */
+    top: 35px; /* Отступ сверху, чтобы не конфликтовать с кнопкой меню */
     right: 25px; /* Отступ справа */
     
     /* Используем Flexbox для размещения логина и кнопки в один ряд */
