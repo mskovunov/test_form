@@ -50,6 +50,9 @@
 		<li><a href="history.html">📜 Історія</a></li> 
 		<li><a href="stats.html">📈 Статистика</a></li>
 		<li><a href="settings.html">⚙️ Налаштування</a></li>
+		<li id="admin-menu-item" style="display: none;">
+			<a href="admin.html">🔒 Адмін-панель</a>
+		</li>
 		<li><a href="#" onclick="handleExit()">🚪 Вихід</a></li> 
 	  </ul>
 	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
@@ -443,6 +446,12 @@ function updatePortToggleUI(status) {
 		async function loadUsername(user) {
             if (!user) return;
             const displayElement = document.getElementById('user-email-display');
+			const adminMenuItem = document.getElementById('admin-menu-item'); 
+			
+			// Скрываем меню по умолчанию
+			if (adminMenuItem) {
+				adminMenuItem.style.display = 'none';
+			}
             
             if (typeof db === 'undefined') {
                 console.error("Firestore не инициализирован. Не могу загрузить username.");
@@ -451,21 +460,29 @@ function updatePortToggleUI(status) {
             
             const userRef = db.collection('users').doc(user.uid);
             
-            // УДАЛЕНО: Показываем Email по умолчанию, пока идет запрос
-
-            userRef.get().then((doc) => {
-                if (doc.exists && doc.data().username) {
-                    // Если username найден в Firestore, используем его
-                    displayElement.textContent = doc.data().username.trim();
-                } else {
-                    // Username не найден или данные неполны, оставляем пустым.
-                    console.warn("Username не найден в Firestore. Оставляем поле пустым.");
-                }
-            }).catch((error) => {
-                console.error("Ошибка при получении username из Firestore:", error);
-                // Оставляем пустым
-            });
+		userRef.get().then((doc) => {
+        if (doc.exists) {
+            const data = doc.data();
+            
+            // 1. Отображение Username
+            if (data.username) {
+                displayElement.textContent = data.username;
+            } else {
+                console.warn("Username не найден в Firestore. Оставляем поле пустым.");
+            }
+            
+            // 2. Проверка и отображение меню администратора (НОВОЕ)
+            if (adminMenuItem && data.role === 'admin') {
+                adminMenuItem.style.display = 'list-item'; // Показываем пункт меню
+                console.log("Пользователь является администратором. Отображена админ-панель.");
+            }
+        } else {
+            console.warn("Документ пользователя не найден в Firestore.");
         }
+    }).catch((error) => {
+        console.error("Ошибка при получении данных пользователя из Firestore:", error);
+    });
+}
 		
 		// --- НОВАЯ ФУНКЦИЯ: Логирование статуса порта в Firestore ---
 	async function logPortStatusChange(user, newStatus, username) {
