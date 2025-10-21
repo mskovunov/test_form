@@ -217,7 +217,7 @@
 
         /* --- НОВЫЕ ФУНКЦИИ ДЛЯ USERNAME/EMAIL В FIRESTORE --- */
 
-        // 1. Поиск Email в Firestore по Username (для ВХОДА)
+        // 1.1 Поиск Email в Firestore по Username (для ВХОДА)
         async function findEmailByUsername(username) {
             const usersRef = db.collection('users');
             const searchUsername = username.toLowerCase();
@@ -228,6 +228,20 @@
             }
             return snapshot.docs[0].data().email;
         }
+		
+		// 1.2 Проверка уникальности usernameLower
+		async function checkUsernameUnique(username) {
+			const usersRef = db.collection('users');
+			
+			// Приводим входной username к нижнему регистру для поиска
+			const searchUsername = username.toLowerCase();
+			
+			// Ищем совпадения в поле usernameLower
+			const snapshot = await usersRef.where('usernameLower', '==', searchUsername).limit(1).get();
+
+			// Возвращаем true, если совпадений нет (уникален)
+			return snapshot.empty; 
+		}
 
         // 2. ФУНКЦИЯ ДЛЯ ЗАПИСИ ДАННЫХ В FIRESTORE (ОБНОВЛЕНО ДЛЯ USERNAME)
         async function saveUserData(user, username = null) {
@@ -335,7 +349,12 @@
                     if (!username || username.trim() === '') {
                         throw { code: 'auth/missing-username', message: '⚠️ Будь ласка, введіть ім\'я користувача.' };
                     }
-                    
+					
+                    const isUnique = await checkUsernameUnique(username);
+					if (!isUnique) {
+						throw { code: 'auth/username-already-in-use', message: '⚠️ Користувач з таким логіном вже існує (без врахування регістру).' };
+					}
+		
                     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
 					const user = userCredential.user;
                     await saveUserData(userCredential.user, username); 
@@ -357,19 +376,21 @@
                 } catch (error) {
                     let errorMessage = 'Помилка: ' + error.message;
                     
-                    if (error.code === 'auth/missing-username') { 
-                        errorMessage = error.message;
-                    } else if (error.code === 'auth/missing-password') {
-						errorMessage = '⚠️ Будь ласка, введіть пароль.';
-					} else if (error.code === 'auth/invalid-email') {
-						errorMessage = '⚠️ Будь ласка, введіть коректний формат email (наприклад, user@domain.com).';
-					} else if (error.code === 'auth/weak-password') {
-						errorMessage = '⚠️ Пароль має бути не менше 6 символів.';
-					} else if (error.code === 'auth/email-already-in-use') {
-						errorMessage = '⚠️ Користувач з цією поштою вже існує.';
-					}
-                    authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
-                    console.error('Signup error:', error);
+                  if (error.code === 'auth/username-already-in-use') {
+					errorMessage = error.message;
+				} else if (error.code === 'auth/missing-username') { 
+					errorMessage = error.message;
+				} else if (error.code === 'auth/missing-password') {
+					errorMessage = '⚠️ Будь ласка, введіть пароль.';
+				} else if (error.code === 'auth/invalid-email') {
+					errorMessage = '⚠️ Будь ласка, введіть коректний формат email (наприклад, user@domain.com).';
+				} else if (error.code === 'auth/weak-password') {
+					errorMessage = '⚠️ Пароль має бути не менше 6 символів.';
+				} else if (error.code === 'auth/email-already-in-use') {
+					errorMessage = '⚠️ Користувач з цією поштою вже існує.';
+				}
+				authStatus.innerHTML = `<p style="color: var(--status-error);">${errorMessage}</p>`;
+				console.error('Signup error:', error);
                 }
             });
 
@@ -414,7 +435,7 @@
 				} catch (error) {
 					let errorMessage = 'Помилка: ' + error.message;
 					
-					if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || errorMessage.includes('Користувач не знайдений')) {
+					if (error.code === 'auth/invalid-login-credentials' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || errorMessage.includes('Користувач не знайдений')) {
 						errorMessage = '⚠️ Невірний логін або пароль.';
 					} else if (error.code === 'auth/missing-password') { 
 						errorMessage = '⚠️ Будь ласка, введіть пароль.';

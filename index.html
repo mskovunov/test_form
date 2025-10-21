@@ -129,7 +129,7 @@
   <script src="config.js"></script>
 	
   <script>
-  //const BUILD_VERSION = 'v2025.10.16.2359'; 
+	let currentUsername = null;
 
     function toggleAccordion(contentId, buffer = 50) {
         const content = document.getElementById(contentId);
@@ -318,7 +318,11 @@ function updatePortToggleUI(status) {
       e.preventDefault();
 
       // 1. Показываем статус "Отправка..."
-      status.innerText = '⏳ Відправка даних...';
+      //status.innerText = '⏳ Відправка даних...';
+	  status.innerHTML = `<span class="inline-spinner-wrapper">
+                            <span class="inline-spinner"></span> 
+                            Відправка даних...
+                          </span>`;
       status.classList.remove('success', 'error', 'show');
       status.classList.add('show'); // Класс 'show' делает его видимым
 
@@ -327,7 +331,8 @@ function updatePortToggleUI(status) {
       data.append("reading", form.reading.value);
 
       let success = false;
-
+	  const currentSelectedUser = form.name.value;
+	  
       try {
         const response = await fetch(WEBAPP_URL, {
           method: "POST",
@@ -364,7 +369,7 @@ function updatePortToggleUI(status) {
             // Сброс формы и обновление предыдущего показателя только при успехе
             form.reset();
             loadPreviousReading(); 
-			
+			setFormUser(currentSelectedUser);
 			
         } else {
             status.innerText = "⚠️ Помилка при відправці даних!";
@@ -449,7 +454,9 @@ function updatePortToggleUI(status) {
             
             // 1. Отображение Username
             if (data.username) {
+				currentUsername = data.username; // СОХРАНЯЕМ ИМЯ в глобальную переменную
                 displayElement.textContent = data.username;
+				setFormUser(currentUsername); // НОВОЕ: Вызываем функцию для установки значения в select
             } else {
                 console.warn("Username не найден в Firestore. Оставляем поле пустым.");
             }
@@ -465,7 +472,31 @@ function updatePortToggleUI(status) {
     }).catch((error) => {
         console.error("Ошибка при получении данных пользователя из Firestore:", error);
     });
-}
+	}
+	
+	function setFormUser(username) {
+    const select = document.querySelector('select[name="name"]');
+    if (!select || !username) return;
+
+    // Ищем опцию, текст которой совпадает с username (например, 'eGolf')
+    let foundOption = false;
+    for (let i = 0; i < select.options.length; i++) {
+        const option = select.options[i];
+        
+        // Сравнение без учета регистра для надежности
+        if (option.value.toLowerCase() === username.toLowerCase()) {
+            option.selected = true;
+            foundOption = true;
+            break;
+        }
+    }
+    
+    if (foundOption) {
+        console.log(`Поле 'Користувач' установлено на: ${username}`);
+    } else {
+        console.warn(`Пользователь '${username}' не найден в списке опций формы.`);
+    }
+	}
 		
 		// --- НОВАЯ ФУНКЦИЯ: Логирование статуса порта в Firestore ---
 	async function logPortStatusChange(user, newStatus, username) {
