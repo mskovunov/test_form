@@ -28,7 +28,7 @@
 	</button>
 	
 	<div id="user-info-header">
-        <div id="user-info-wrapper">
+        <div id="user-info-wrapper" onclick="showUserProfile()">
      <span id="user-email-display" title="Ваш користувач"></span>
         </div>
         <button id="logout-inline-button" onclick="handleLogout()" title="Вийти з облікового запису">
@@ -198,29 +198,6 @@
         console.error('Помилка при отриманні попереднього показника:', err);
       }
     }
-
-    // ИЗМЕНЕНИЕ 3: Удалена старая функция loadHistory()
-    /*
-    async function loadHistory() {
-      const historyDiv = document.getElementById('history');
-      const button = document.getElementById('historyButton');
-      button.disabled = true;
-      button.innerText = '⏳ Завантаження...';
-
-      try {
-        const resp = await fetch(WEBAPP_URL + '?history=1');
-        const html = await resp.text();
-        historyDiv.innerHTML = html;
-        historyDiv.style.display = 'block';
-        button.style.display = 'none';
-      } catch (err) {
-        historyDiv.innerHTML = '<p>⚠️ Помилка при завантаженні історії.</p>';
-        console.error('Помилка історії:', err);
-        button.disabled = false;
-        button.innerText = 'Переглянути історію';
-      }
-    }
-    */
 	
 /* --- ДОБАВЛЕНО: loadPortStatusFromSheet (с управлением загрузчиком) --- */
     async function loadPortStatusFromSheet() {
@@ -325,6 +302,12 @@ function updatePortToggleUI(status) {
 		function toggleMenu() {
 	  const menu = document.getElementById("sideMenu");
 	  menu.classList.toggle("open");
+	}
+	
+	// НОВАЯ ФУНКЦИЯ: Заглушка для клика по имени пользователя
+	function showUserProfile() {
+		//alert("Переход в профиль пользователя (заглушка)");
+		console.log("Clicked on user profile link.");
 	}
 
 	

@@ -67,6 +67,10 @@
 									</svg>
 								</span>
 							</div>
+							
+							<div style="text-align: right; margin-top: 5px; font-size: 0.9rem;">
+								<a href="#" id="forgot-password-link">Забули пароль?</a>
+							</div>
                             
                             <div style="margin-top: 25px;">
                                 <button id="login-button" class="action-button primary-button">Увійти</button>
@@ -216,8 +220,8 @@
         // 1. Поиск Email в Firestore по Username (для ВХОДА)
         async function findEmailByUsername(username) {
             const usersRef = db.collection('users');
-            
-            const snapshot = await usersRef.where('username', '==', username).limit(1).get();
+            const searchUsername = username.toLowerCase();
+            const snapshot = await usersRef.where('usernameLower', '==', searchUsername).limit(1).get();
 
             if (snapshot.empty) {
                 return null; 
@@ -237,6 +241,8 @@
             
             if (username) {
                 updateData.username = username; 
+				// ДОБАВЛЕНО: Сохраняем версию в нижнем регистре для поиска
+				updateData.usernameLower = username.toLowerCase();				
             }
 
             try {
@@ -277,6 +283,7 @@
             const usernameLoginInput = document.getElementById('username-login-input'); 
             const passwordInput = document.getElementById('password-input');
             const googleLoginButton = document.getElementById('google-login-button');
+			const forgotPasswordLink = document.getElementById('forgot-password-link');
             
             // Элементы РЕГИСТРАЦИИ
 			const signupForm = document.getElementById('signup-form'); // <--- ДОБАВЛЕНО
@@ -330,10 +337,14 @@
                     }
                     
                     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+					const user = userCredential.user;
                     await saveUserData(userCredential.user, username); 
                     
-                    // УСПЕХ РЕГИСТРАЦИИ: Переключаем на вкладку "Вход" 
-                    authStatus.innerHTML = '✅ Реєстрація успішна! Увійдіть, використовуючи Ваш логін.';
+					// НОВОЕ: Отправка письма для верификации
+					await user.sendEmailVerification();
+					
+					// ИЗМЕНЕНО: Новое сообщение об успехе с инструкцией по верификации
+					authStatus.innerHTML = '✅ Реєстрація успішна! Перевірте Вашу пошту для активації облікового запису.';
                     signupEmailInput.value = '';
                     signupUsernameInput.value = '';
                     signupPasswordInput.value = '';
@@ -374,15 +385,31 @@
 				authStatus.innerHTML = '<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Вхід...</span>';
 
 				try {
-					const email = await findEmailByUsername(username);
+					const usernameInput = usernameLoginInput.value; // Берем значение из поля (например, 'egolf')
+					
+					// 1. Ищем email (логика без учета регистра)
+					const email = await findEmailByUsername(usernameInput);
 
 					if (!email) {
 						throw { code: 'auth/user-not-found', message: 'Користувач не знайдений' };
 					}
 					
+					// 2. Вход
 					const userCredential = await auth.signInWithEmailAndPassword(email, password);
-					
-					await saveUserData(userCredential.user, username); 
+					const user = userCredential.user;
+
+					// 3. НОВОЕ: Загружаем оригинальный username (с регистром) из Firestore
+					const userDoc = await db.collection('users').doc(user.uid).get();
+					let originalUsername = null;
+
+					if (userDoc.exists) {
+						originalUsername = userDoc.data().username; // Получаем 'eGolf'
+					}
+
+					// 4. Обновление данных (только lastSignInTime). 
+					// Если originalUsername найден, мы передаем его, чтобы он не был перезаписан нижним регистром.
+					// Если его нет (хотя не должно быть), мы используем значение из поля ввода для страховки.
+					await saveUserData(user, originalUsername || usernameInput);	
 
 				} catch (error) {
 					let errorMessage = 'Помилка: ' + error.message;
@@ -438,6 +465,50 @@
 					const targetId = this.dataset.target;
 					togglePasswordVisibility(targetId, this);
 				});
+			});
+			
+			// 6. Обработчик ссылки "Забули пароль?"
+				forgotPasswordLink.addEventListener('click', async (e) => {
+				e.preventDefault();
+				const username = usernameLoginInput.value.trim();
+
+				authStatus.style.display = 'block';
+				authStatus.innerHTML = '<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Пошук email та відправка інструкцій...</span>';
+
+				try {
+					if (!username) {
+						throw new Error('Будь ласка, введіть ім\'я користувача (логін) для відновлення пароля.');
+					}
+
+					// 1. Находим email по username
+					const email = await findEmailByUsername(username);
+
+					if (!email) {
+						throw new Error('Користувач з таким логіном не знайдений.');
+					}
+
+					// 2. Отправляем письмо для сброса
+					await auth.sendPasswordResetEmail(email);
+
+					authStatus.innerHTML = `<p style="color: var(--status-success);">✅ Інструкції для відновлення пароля відправлені на пошту: ${email}.</p>`;
+					
+				} catch (error) {
+					let errorMessage = error.message || 'Невідома помилка.';
+					
+					if (error.code === 'auth/network-request-failed') {
+						 errorMessage = 'Помилка мережі. Перевірте з\'єднання.';
+					}
+					// Специальная обработка для пользовательских ошибок
+					if (errorMessage.includes('логіном не знайдений') || errorMessage.includes('введіть ім\'я користувача')) {
+						// Оставляем пользовательское сообщение
+					} else {
+						 // Иначе показываем общую ошибку Firebase
+						 errorMessage = `Помилка: ${errorMessage}`;
+					}
+
+					authStatus.innerHTML = `<p style="color: var(--status-error);">⚠️ ${errorMessage}</p>`;
+					console.error('Password Reset Error:', error);
+				}
 			});
 			
 		    document.getElementById('buildVersion').textContent = BUILD_VERSION; 	

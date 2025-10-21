@@ -401,6 +401,21 @@ label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    
+    cursor: pointer;
+    /* ИЗМЕНЕНО: Добавляем transform в transition */
+    transition: background-color 0.2s, opacity 0.2s, transform 0.2s, box-shadow 0.2s; 
+}
+
+#user-info-wrapper:hover {
+    /* ДОБАВЛЕНО: Эффект подъема, как у кнопки "Відправити" */
+    transform: translateY(-2px); 
+    /* Усилим тень, чтобы подчеркнуть, что элемент поднялся */
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+    
+    /* Сохраняем предыдущий эффект для фона */
+    opacity: 0.9;
+    background-color: var(--table-hover);
 }
 
 #user-email-display {
@@ -926,4 +941,17 @@ label {
 
 .toggle-password:hover {
     color: var(--text-color);
+}
+
+/* --- СТИЛИ ДЛЯ ССЫЛКИ "ЗАБУЛИ ПАРОЛЬ" --- */
+#forgot-password-link {
+    color: var(--text-color-secondary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+
+#forgot-password-link:hover {
+    color: var(--button-bg);
+    text-decoration: underline;
 }
