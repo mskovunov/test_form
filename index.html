@@ -17,6 +17,17 @@
 </head>
 <body>
 
+	<div id="logout-modal" class="modal">
+		<div class="modal-content">
+			<h3>Підтвердження</h3>
+			<p>Ви впевнені, що хочете вийти з облікового запису?</p>
+			<div class="modal-actions">
+				<button id="modal-cancel-btn" class="secondary-button">Скасувати</button>
+				<button id="modal-confirm-btn" class="action-button modal-confirm-btn">Вийти</button>
+			</div>
+		</div>
+	</div>
+
   <div class="container">
   	  <!-- Кнопка меню -->
 	<button class="menu-button" onclick="toggleMenu()">
@@ -386,15 +397,50 @@ function updatePortToggleUI(status) {
     });
 
 		// --- ФУНКЦИЯ: Выход из системы (Logout) ---
-		async function handleLogout() {
-			// НОВОЕ: Запрос подтверждения перед выходом
-			const isConfirmed = confirm("Ви впевнені, що хочете вийти з облікового запису?");
-
-			if (!isConfirmed) {
-				console.log("Вихід скасовано користувачем.");
-				return; // Прекращаем выполнение, если пользователь отменил
-			}
+		// --- НОВАЯ ФУНКЦИЯ: Показать кастомное модальное окно ---
+		function showLogoutModal() {
+			const modal = document.getElementById('logout-modal');
+			const confirmBtn = document.getElementById('modal-confirm-btn');
+			const cancelBtn = document.getElementById('modal-cancel-btn');
 			
+			// 1. Показываем модальное окно
+			modal.style.display = 'flex';
+			// Добавляем класс для активации CSS-анимации
+			setTimeout(() => modal.classList.add('visible'), 10); 
+
+			// 2. Обновляем обработчики
+			// Кнопка "Вийти" (Подтверждение)
+			confirmBtn.onclick = () => {
+				hideLogoutModal();
+				handleLogoutConfirm(); // Вызываем фактическую функцию выхода
+			};
+			
+			// Кнопка "Скасувати"
+			cancelBtn.onclick = () => {
+				hideLogoutModal();
+				console.log("Выход отменен пользователем.");
+			};
+			
+			// Закрытие по клику вне окна
+			modal.onclick = (e) => {
+				if (e.target.id === 'logout-modal') {
+					hideLogoutModal();
+					console.log("Выход отменен пользователем.");
+				}
+			};
+		}
+
+		// --- НОВАЯ ФУНКЦИЯ: Скрыть модальное окно ---
+		function hideLogoutModal() {
+			const modal = document.getElementById('logout-modal');
+			modal.classList.remove('visible');
+			// Скрываем после анимации
+			setTimeout(() => { modal.style.display = 'none'; }, 200); 
+		}
+
+
+		// --- ФУНКЦИЯ: Выход из системы (Logout) - ФАКТИЧЕСКИЙ ВЫХОД ---
+		async function handleLogoutConfirm() {
 			try {
 				await auth.signOut();
 				console.log("Успешный выход из Firebase.");
@@ -406,6 +452,11 @@ function updatePortToggleUI(status) {
 				console.error("Ошибка при выходе из Firebase:", error);
 				alert("Помилка виходу: " + error.message);
 			}
+		}
+		
+		async function handleLogout() {
+			// ВЫЗЫВАЕМ КАСТОМНОЕ МОДАЛЬНОЕ ОКНО ВМЕСТО confirm()
+			showLogoutModal();
 		}
 
 		/* --- ДОБАВЛЕНО: ФУНКЦИЯ ЗАКРЫТИЯ WEBVIEW --- */
