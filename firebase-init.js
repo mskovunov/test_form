@@ -2,7 +2,7 @@
 
 // Конфигурация Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyA91w3MTHWuUAQnbvfE1sxVNz2bRM1DuSU",
+    apiKey: "AIzaSyAsr-JbArcAu-7_csBxM6VDsC7hyPz7qB0",
     authDomain: "meter-form.firebaseapp.com",
     projectId: "meter-form",
     storageBucket: "meter-form.firebasestorage.app",
