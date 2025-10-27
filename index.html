@@ -54,21 +54,8 @@
   <div class="form-wrapper">
 
 	<!-- Боковое меню -->
-	<div class="side-menu" id="sideMenu">
-	  <button class="close-button" onclick="toggleMenu()">❌</button>	  	  
-	  <ul>
-		<li><a href="index.html">🏠 Головна</a></li> 
-		<li><a href="history.html">📜 Історія</a></li> 
-		<li><a href="stats.html">📈 Статистика</a></li>
-		<li><a href="settings.html">⚙️ Налаштування</a></li>
-		<li id="admin-menu-item" style="display: none;">
-			<a href="admin.html">🔒 Адмін-панель</a>
-		</li>
-		<li><a href="#" onclick="handleExit()">🚪 Вихід</a></li> 
-	  </ul>
-	  <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
-	</div>
-
+	<div id="sidebar-placeholder"></div>
+	
     <h2>Форма для передачі показників лічильника</h2>
 
 <label>🔌 Статус порта зарядки: </label>
@@ -138,6 +125,7 @@
 
   <!-- Подключаем файл конфигурации ПЕРЕД основным скриптом -->
   <script src="config.js"></script>
+  <script src="utils.js"></script>
 	
   <script>
 	let currentUsername = null;
@@ -298,17 +286,18 @@ function updatePortToggleUI(status) {
 
 	
 /* --- ИСПРАВЛЕННЫЙ И ОБЪЕДИНЕННЫЙ DOMContentLoaded --- */
-    window.addEventListener('DOMContentLoaded', () => {
-	  
+window.addEventListener('DOMContentLoaded', async () => {
+
 	  // АСИНХРОННО: Запрашиваем актуальный статус из GAS 
-	  loadPortStatusFromSheet(); 
-	  
-      loadPreviousReading();
-      if (localStorage.getItem('theme') === 'dark') {
-        document.body.classList.add('dark');
-      }
-      document.getElementById('buildVersion').textContent = BUILD_VERSION; 
-    });
+	  loadPortStatusFromSheet();  
+loadPreviousReading();
+if (localStorage.getItem('theme') === 'dark') {
+document.body.classList.add('dark');
+}
+	    await loadComponent('sidebar-placeholder', 'sidebar.html');
+document.getElementById('buildVersion').textContent = BUILD_VERSION; 
+});
+
 
 		function toggleMenu() {
 	  const menu = document.getElementById("sideMenu");
@@ -325,8 +314,8 @@ function updatePortToggleUI(status) {
     const form = document.getElementById("meterForm");
     const status = document.getElementById("status");
 
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault();
+form.addEventListener("submit", async function (e) {
+e.preventDefault();
 
       // 1. Показываем статус "Отправка..."
       //status.innerText = '⏳ Відправка даних...';
@@ -337,20 +326,19 @@ function updatePortToggleUI(status) {
       status.classList.remove('success', 'error', 'show');
       status.classList.add('show'); // Класс 'show' делает его видимым
 
-      const data = new URLSearchParams();
-      data.append("name", form.name.value);
-      data.append("reading", form.reading.value);
+const data = new URLSearchParams();
+data.append("name", form.name.value);
+data.append("reading", form.reading.value);
 
-      let success = false;
+let success = false;
 	  const currentSelectedUser = form.name.value;
 	  
-      try {
-        const response = await fetch(WEBAPP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: data.toString(),
-        });
-        
+try {
+const response = await fetch(WEBAPP_URL, {
+method: "POST",
+headers: { "Content-Type": "application/x-www-form-urlencoded" },
+body: data.toString(),
+});
         // ВАЖНОЕ ИЗМЕНЕНИЕ: Читаем ответ как текст, чтобы избежать сбоев при обработке редиректа в GAS.
         const responseText = await response.text(); 
         
@@ -362,10 +350,10 @@ function updatePortToggleUI(status) {
             success = false;
         }
 
-      } catch (err) {
-        console.error("Помилка при відправці:", err);
-        success = false;
-      } finally {
+} catch (err) {
+console.error("Помилка при відправці:", err);
+success = false;
+} finally {
         
         // 2. Обновляем статус
         if (success) {
@@ -388,13 +376,13 @@ function updatePortToggleUI(status) {
         }
         
         // 3. Скрываем статус через 3 секунды
-        setTimeout(() => {
+        setTimeout(() => {
             status.classList.remove("show", "success", "error");
         }, 3000);
 
         // 4. УДАЛЕНА вся логика с win.open и win.close
-      }
-    });
+}
+});
 
 		// --- ФУНКЦИЯ: Выход из системы (Logout) ---
 		// --- НОВАЯ ФУНКЦИЯ: Показать кастомное модальное окно ---

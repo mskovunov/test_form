@@ -1,156 +1,215 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
-    <title>EV Зарядки поблизости</title>
-    <style>
-        /* Стили для карты, чтобы она занимала весь экран */
-        #map {
-            height: 100vh;
-            width: 100%;
-        }
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <title>Адмін-панель</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-N0T0138X0Q"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-N0T0138X0Q');
+    </script>
 </head>
 <body>
-    <div id="map"></div>
+    <div class="container">
+        
+        <button class="menu-button" onclick="toggleMenu()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 18H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        
+        <div class="form-wrapper">
 
-        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsr-JbArcAu-7_csBxM6VDsC7hyPz7qB0&libraries=places"></script>
+            <div class="side-menu" id="sideMenu">
+                <button class="close-button" onclick="toggleMenu()">❌</button>
+                <ul>
+                    <li><a href="index.html">🏠 Головна</a></li> 
+                    <li><a href="history.html">📜 Історія</a></li> 
+                    <li><a href="stats.html">📈 Статистика</a></li>
+                    <li><a href="settings.html">⚙️ Налаштування</a></li>
+                    <li><a href="#" onclick="handleExit()">🚪 Вихід</a></li>
+                </ul>
+                <button type="button" class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+            </div>
+
+
+            <h2>Панель адміністратора</h2>
+
+            <p id="admin-status" style="text-align: center; margin-bottom: 20px;"></p>
+
+            <div id="log-table-container">
+                </div>
+            
+            <p id="buildVersion" style="margin-top: 20px; font-size: 0.75rem; color: #999; text-align: center;"></p>
+            
+        </div>
+    </div>
+  
+    <script src="config.js"></script>	
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="./firebase-init.js"></script>
 
     <script>
-        // Мы определяем асинхронную функцию, чтобы использовать 'await'
-        async function initMap() {
+    
+    // Глобальная переменная для отслеживания статуса
+    let isAdmin = false;
 
-            // --- НОВЫЙ БЛОК: ОПРЕДЕЛЕНИЕ ГЕОЛОКАЦИИ ---
-            
-            let centerLocation; // Объявляем переменную для центра
-            const kyivCenter = { lat: 50.4501, lng: 30.5234 }; // Киев по умолчанию
+    // --- Вспомогательные функции (скопированы из index.html) ---
+    function toggleTheme() {
+        const isDark = document.body.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+    
+    function toggleMenu() {
+        const menu = document.getElementById("sideMenu");
+        menu.classList.toggle("open");
+    }
+    
+    async function handleLogout() {
+        try {
+            await auth.signOut();
+            window.location.replace('auth.html'); 
+        } catch (error) {
+            console.error("Ошибка при выходе из Firebase:", error);
+            alert("Помилка виходу: " + error.message);
+        }
+    }
 
-            // Проверяем, доступна ли геолокация в браузере
-            if (navigator.geolocation) {
-                try {
-                    // Создаем Promise, чтобы "дождаться" ответа пользователя
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            timeout: 5000 // Ждем ответа 5 секунд
-                        });
-                    });
-                    
-                    // УСПЕХ: Пользователь разрешил
-                    centerLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
+    function handleExit() {
+        handleLogout(); 
+    }
 
-                } catch (error) {
-                    // ОШИБКА: Пользователь отклонил или произошел сбой
-                    if (error.code === error.PERMISSION_DENIED) {
-                        alert("Вы отклонили запрос геолокации. Показываем центр Киева.");
-                    } else {
-                        alert("Не удалось определить геолокацию. Показываем центр Киева.");
-                    }
-                    console.warn("Ошибка геолокации:", error.message);
-                    centerLocation = kyivCenter; // Используем Киев
-                }
-            } else {
-                // Браузер не поддерживает геолокацию
-                alert("Ваш браузер не поддерживает геолокацию. Показываем центр Киева.");
-                centerLocation = kyivCenter; // Используем Киев
-            }
-            // --- КОНЕЦ НОВОГО БЛОКА ---
+    // --- ФУНКЦИИ АДМИНИСТРАТОРА ---
 
-
-            // 1. Ждем загрузки библиотек API
-            const { Map } = await google.maps.importLibrary("maps");
-            const { Place } = await google.maps.importLibrary("places");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-            const infowindow = new google.maps.InfoWindow();
-
-            // 2. Создаем карту
-            // ИСПОЛЬЗУЕМ 'centerLocation' вместо 'kyivCenter'
-            const map = new Map(document.getElementById("map"), {
-                center: centerLocation, // <-- ИЗМЕНЕНИЕ
-                zoom: 14, // Увеличим зум, чтобы было видно детали
-                mapId: "4a62d317fcaba9b4f0b995aa" // <-- ВАШ ID КАРТЫ
-            });
-
-            // 3. Формируем запрос для НОВОГО API
-            const request = {
-                includedTypes: ['electric_vehicle_charging_station'],
-                locationRestriction: {
-                    center: centerLocation, // <-- ИЗМЕНЕНИЕ
-                    radius: 5000, // 5 км
-                },
-                // 'fields' (массив) - это правильный синтаксис
-                fields: ['displayName', 'location', 'id']
-            };
-
-            // 4. Выполняем поиск
-            try {
-                const { places } = await Place.searchNearby(request);
-
-                if (places && places.length > 0) {
-                    
-                    // 5. Создаем маркеры для каждой станции
-                    places.forEach(place => {
-                        // Используем новый "Продвинутый" маркер
-                        const marker = new AdvancedMarkerElement({
-                            map,
-                            position: place.location,
-                            title: place.displayName,
-                        });
-
-                        // 6. Добавляем слушатель клика
-                        marker.addListener("click", async () => {
-                            // Создаем объект Place для запроса деталей
-                            const detailPlace = new Place({ id: place.id });
-
-                            // Запрашиваем нужные поля (включая 'evChargeOptions' для цены)
-                            await detailPlace.fetchFields({ 
-                                fields: ['displayName', 'formattedAddress', 'evChargeOptions'] 
-                            });
-
-                            const details = detailPlace;
-
-                            // 7. Ищем цену (логика та же)
-                            let priceInfo = "Цена не указана";
-                            if (details.evChargeOptions && details.evChargeOptions.connectorAggregations) {
-                                const firstConnectorWithPrice = details.evChargeOptions.connectorAggregations.find(conn => conn.price);
-                                if (firstConnectorWithPrice && firstConnectorWithPrice.price) {
-                                    priceInfo = firstConnectorWithPrice.price.text; // "15,00 грн/кВт·год"
-                                }
-                            }
-
-                            // 8. Показываем InfoWindow
-                            const content = `
-                                <div>
-                                    <strong>${details.displayName}</strong><br>
-                                    Адрес: ${details.formattedAddress || 'Адрес не указан'}<br>
-                                    <strong>Цена: ${priceInfo}</strong>
-                                D/div>
-                            `;
-                            
-                            infowindow.setContent(content);
-                            infowindow.open(map, marker);
-                        });
-                    });
-
-                } else {
-                    alert("В радиусе 5 км зарядных станций не найдено.");
-                }
-
-            } catch (error) {
-                console.error("Ошибка поиска Places:", error);
-                alert("Произошла ошибка при поиске станций.");
-            }
+    async function checkAdminStatus(user) {
+        if (!user || typeof db === 'undefined') {
+            window.location.replace('auth.html'); // Не авторизован
+            return;
         }
 
-        // Вызываем функцию вручную
-        initMap();
+        const userRef = db.collection('users').doc(user.uid);
+        try {
+            const doc = await userRef.get();
+            const data = doc.data();
+            
+            if (doc.exists && data.role === 'admin') {
+                isAdmin = true;
+                // Администратор, загружаем логи
+                loadPortLogs();
+            } else {
+                alert('Доступ заборонено. Тільки адміністратори можуть переглядати цю сторінку.');
+                window.location.replace('index.html'); // Перенаправляем обратно
+            }
+        } catch (error) {
+            console.error("Ошибка проверки роли администратора:", error);
+            alert('Ошибка доступа.');
+            window.location.replace('index.html');
+        }
+    }
+
+    // --- ЗАГРУЗКА И РЕНДЕРИНГ ЛОГОВ ---
+
+    async function loadPortLogs() {
+        const logDiv = document.getElementById('log-table-container');
+        const statusDiv = document.getElementById('admin-status');
         
+        // Показываем спиннер
+        statusDiv.innerHTML = `<span class="inline-spinner-wrapper"><span class="inline-spinner"></span> Завантаження логів порту...</span>`;
+        statusDiv.style.display = 'block';
+
+        try {
+            // Получаем логи, сортируем по времени (новые сверху)
+            const logsRef = db.collection('port_logs');
+            const snapshot = await logsRef.orderBy('timestamp', 'desc').limit(200).get(); // Ограничение в 200 логов
+            
+            statusDiv.style.display = 'none';
+
+            if (snapshot.empty) {
+                logDiv.innerHTML = '<p style="text-align: center;">Логи перемикання порту не знайдено.</p>';
+            } else {
+                const logData = snapshot.docs.map(doc => doc.data());
+                renderLogTable(logData, logDiv);
+            }
+            
+        } catch (error) {
+            console.error("Ошибка загрузки логов:", error);
+            statusDiv.innerHTML = `<p style="color: var(--status-error);">⚠️ Помилка завантаження логів. Перевірте Правила Firestore.</p>`;
+        }
+    }
+
+    function renderLogTable(data, container) {
+        let html = `
+            <div class="table-scroll">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Час (місцевий)</th>
+                            <th>Користувач (логін)</th>
+                            <th class="status-col">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.forEach(row => {
+            // Используем сохраненное локальное время или конвертируем серверный timestamp
+            const timeValue = row.timestamp ? row.timestamp.toDate() : new Date(); 
+            const localTimeString = row.localTime || timeValue.toLocaleDateString('uk-UA', { 
+                day: '2-digit', month: '2-digit', year: 'numeric', 
+                hour: '2-digit', minute: '2-digit', second: '2-digit', 
+                hour12: false 
+            }).replace(',', ''); 
+            
+            const statusUA = row.statusUA || (row.status === 'busy' ? 'Зайнятий' : 'Доступний');
+            // Используем классы из style.css
+            const statusClass = row.status === 'busy' ? 'inactive' : 'active';
+            const statusIcon = row.status === 'busy' ? '🔴' : '🟢';
+
+            html += `
+                <tr class="row-${statusClass}">
+                    <td>${localTimeString}</td>
+                    <td>${row.username || row.email || row.userId || 'Невідомий'}</td>
+                    <td class="status-col">
+                        <span class="status-indicator status-${statusClass}">
+                            ${statusIcon} ${statusUA}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    // --- Инициализация ---
+    window.addEventListener('DOMContentLoaded', () => {
+        // Загрузка темы
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark');
+        }
+        
+        document.getElementById('buildVersion').textContent = BUILD_VERSION;
+        
+        // Запускаем проверку авторизации и роли
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                checkAdminStatus(user);
+            } else {
+                window.location.replace('auth.html'); // Если не вошел, отправляем на логин
+            }
+        });
+    });
     </script>
 </body>
 </html>
