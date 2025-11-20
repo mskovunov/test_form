@@ -33,15 +33,15 @@
 
       .info-card {
         background: #fff;
-        border: 2px solid transparent; /* Для рамки при виділенні */
+        border: 2px solid transparent;
         border-color: #eee;
         border-radius: 10px;
         padding: 15px;
-        flex: 1 1 150px;
-        min-width: 140px;
+        flex: 1 1 140px;
+        min-width: 130px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         text-align: center;
-        cursor: pointer; /* Курсор у вигляді руки */
+        cursor: pointer;
         transition: all 0.2s ease;
       }
 
@@ -50,37 +50,36 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
 
-      /* Стиль для активної картки */
+      /* Активная карточка */
       .info-card.active-card {
-        border-color: #007bff;
         background-color: #f0f8ff;
+        border-color: currentColor; /* Цвет рамки берется от цвета текста */
       }
-
       .dark .info-card {
         background: #2b2b2b;
         border-color: #444;
       }
       .dark .info-card.active-card {
-        border-color: #007bff;
         background-color: #333;
       }
 
       .info-card h3 {
         margin: 0 0 10px 0;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: #888;
         text-transform: uppercase;
       }
       .info-card .value {
-        font-size: 1.8rem;
+        font-size: 1.5rem; /* Чуть уменьшил шрифт, чтобы влезло 4 карточки */
         font-weight: bold;
         color: #333;
       }
       .dark .info-card .value {
         color: #eee;
       }
+
       .info-card .unit {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: #aaa;
         margin-left: 4px;
       }
@@ -139,13 +138,9 @@
         <div id="sidebar-placeholder"></div>
 
         <h2>Моніторинг Енергомережі</h2>
-        <p style="text-align: center; font-size: 0.9rem; color: #888">
-          Натисніть на картку, щоб змінити графік
-        </p>
-
         <p
           id="admin-status"
-          style="text-align: center; margin-bottom: 20px"
+          style="text-align: center; margin-bottom: 10px; height: 20px"
         ></p>
 
         <div id="monitoring-section" style="display: none">
@@ -154,30 +149,47 @@
               class="info-card"
               id="card-voltage"
               onclick="setChartMode('voltage')"
+              style="color: #ff9800"
             >
               <h3>Напруга</h3>
-              <div class="value" style="color: #ff9800">
+              <div class="value" style="color: inherit">
                 <span id="disp-voltage">--</span><span class="unit">V</span>
               </div>
             </div>
+
             <div
               class="info-card active-card"
               id="card-power"
               onclick="setChartMode('power')"
+              style="color: #007bff"
             >
               <h3>Потужність</h3>
-              <div class="value" style="color: #007bff">
+              <div class="value" style="color: inherit">
                 <span id="disp-power">--</span><span class="unit">W</span>
               </div>
             </div>
+
             <div
               class="info-card"
               id="card-energy"
               onclick="setChartMode('energy')"
+              style="color: #6f42c1"
             >
-              <h3>Лічильник</h3>
-              <div class="value" style="color: #28a745">
+              <h3>Лічильник (Total)</h3>
+              <div class="value" style="color: inherit">
                 <span id="disp-energy">--</span><span class="unit">kWh</span>
+              </div>
+            </div>
+
+            <div
+              class="info-card"
+              id="card-daily"
+              onclick="setChartMode('daily')"
+              style="color: #28a745"
+            >
+              <h3>Сьогодні</h3>
+              <div class="value" style="color: inherit">
+                <span id="disp-daily">--</span><span class="unit">kWh</span>
               </div>
             </div>
           </div>
@@ -186,6 +198,7 @@
             <canvas id="powerChart"></canvas>
           </div>
         </div>
+
         <p
           id="buildVersion"
           style="
@@ -206,22 +219,23 @@
     <script src="utils.js"></script>
 
     <script>
-      // Глобальні змінні
       let isAdmin = false;
       let powerChart = null;
-
-      // Поточний режим графіка ('power', 'voltage', 'energy')
       let currentMode = "power";
 
-      // Зберігаємо завантажені дані, щоб не робити запит знову при кліку
+      // Для расчетов "суточного" пробега
+      let todayStartEnergy = null;
+
+      // Кеш данных для графиков
       let cachedData = {
         labels: [],
         power: [],
         voltage: [],
-        energy: [],
+        energy: [], // Данные для общего счетчика
+        dailyEnergyProfile: [], // Данные для суточного графика
       };
 
-      // Налаштування кольорів для різних режимів
+      // Конфигурация цветов для 4 режимов
       const chartConfig = {
         power: {
           label: "Потужність (W)",
@@ -234,72 +248,89 @@
           bg: "rgba(255, 152, 0, 0.1)",
         },
         energy: {
-          label: "Енергія (kWh)",
+          label: "Всього накопичено (kWh)",
+          color: "rgb(111, 66, 193)",
+          bg: "rgba(111, 66, 193, 0.1)",
+        }, // Фиолетовый
+        daily: {
+          label: "Споживання сьогодні (kWh)",
           color: "rgb(40, 167, 69)",
           bg: "rgba(40, 167, 69, 0.1)",
-        },
+        }, // Зеленый
       };
 
-      // --- ФУНКЦІЯ ПЕРЕМИКАННЯ ГРАФІКА (викликається при кліку) ---
+      // --- ПЕРЕМИКАННЯ РЕЖИМІВ ---
       window.setChartMode = function (mode) {
         currentMode = mode;
 
-        // 1. Оновлюємо стиль карток (виділення)
+        // Убираем активный класс со всех, добавляем нужному
         document
           .querySelectorAll(".info-card")
           .forEach((el) => el.classList.remove("active-card"));
         document.getElementById(`card-${mode}`).classList.add("active-card");
 
-        // 2. Оновлюємо графік даними з кешу
         updateChartData();
       };
 
       function updateChartData() {
         if (!powerChart) return;
-
         const cfg = chartConfig[currentMode];
 
-        // Міняємо налаштування ліній
         powerChart.data.datasets[0].label = cfg.label;
         powerChart.data.datasets[0].borderColor = cfg.color;
         powerChart.data.datasets[0].backgroundColor = cfg.bg;
 
-        // Підставляємо потрібні дані з масиву
-        powerChart.data.labels = cachedData.labels; // Час однаковий для всіх
-        powerChart.data.datasets[0].data = cachedData[currentMode]; // Дані залежать від режиму
+        // Подставляем нужный массив данных
+        if (currentMode === "daily") {
+          powerChart.data.datasets[0].data = cachedData.dailyEnergyProfile;
+        } else {
+          powerChart.data.datasets[0].data = cachedData[currentMode];
+        }
 
+        // Настройка начала оси Y
+        // Для Напряжения (voltage) и Общего счетчика (energy) лучше НЕ начинать с нуля,
+        // иначе график будет прямой линией где-то вверху.
+        if (currentMode === "voltage" || currentMode === "energy") {
+          powerChart.options.scales.y.beginAtZero = false;
+        } else {
+          powerChart.options.scales.y.beginAtZero = true; // Для Power и Daily лучше с 0
+        }
+
+        powerChart.data.labels = cachedData.labels;
         powerChart.update();
       }
 
-      // --- ПЕРЕВІРКА АДМІНІСТРАТОРА ---
-      async function checkAdminStatus(user) {
-        if (!user || typeof db === "undefined") {
-          window.location.replace("auth.html");
-          return;
-        }
-        const userRef = db.collection("users").doc(user.uid);
-        try {
-          const doc = await userRef.get();
-          const data = doc.data();
-          if (doc.exists && data.role === "admin") {
-            isAdmin = true;
-            document.getElementById("monitoring-section").style.display =
-              "block";
-            initPowerMonitor();
-          } else {
-            alert("Доступ заборонено.");
-            window.location.replace("index.html");
-          }
-        } catch (error) {
-          console.error("Помилка перевірки ролі:", error);
-          window.location.replace("index.html");
-        }
+      // --- ПОИСК ДАННЫХ НА НАЧАЛО ДНЯ ---
+      function fetchTodayStartEnergy() {
+        const now = new Date();
+        const dateString =
+          now.getFullYear() +
+          "-" +
+          String(now.getMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(now.getDate()).padStart(2, "0");
+
+        const startOfDayStr = dateString + " 00:00:00";
+
+        db.collection("meter_readings")
+          .where("created_at", ">=", startOfDayStr)
+          .orderBy("created_at", "asc")
+          .limit(1)
+          .get()
+          .then((snapshot) => {
+            if (!snapshot.empty) {
+              todayStartEnergy = snapshot.docs[0].data().energy;
+              console.log("Start Energy Today:", todayStartEnergy);
+            } else {
+              todayStartEnergy = null;
+            }
+          })
+          .catch((error) => console.error("Index Error check:", error));
       }
 
-      // --- ЛОГІКА МОНІТОРИНГУ ---
+      // --- ГЛАВНАЯ ФУНКЦИЯ ---
       function initPowerMonitor() {
         const ctx = document.getElementById("powerChart").getContext("2d");
-        // ... (код создания new Chart оставляем как был) ...
         const isDark = document.body.classList.contains("dark");
         const gridColor = isDark ? "#444" : "#eee";
         const textColor = isDark ? "#ccc" : "#666";
@@ -330,7 +361,7 @@
             scales: {
               x: { ticks: { color: textColor }, grid: { display: false } },
               y: {
-                beginAtZero: false,
+                beginAtZero: true,
                 ticks: { color: textColor },
                 grid: { color: gridColor },
               },
@@ -339,38 +370,39 @@
           },
         });
 
-        // === ДОБАВЛЕН ТАЙМЕР ПРОВЕРКИ ОФФЛАЙНА ===
+        // Таймер офлайна
         setInterval(() => {
           const statusEl = document.getElementById("admin-status");
-          const lastUpdateEl = document.getElementById("last-update-time"); // Можно добавить такой элемент в HTML если нужно
-
-          // Если у нас есть время последнего пакета
           if (window.lastDataTime) {
-            const now = new Date();
-            const diffSeconds = (now - window.lastDataTime) / 1000;
-
-            if (diffSeconds > 30) {
-              // Данные устарели (более 30 сек задержки)
+            const diffSeconds = (new Date() - window.lastDataTime) / 1000;
+            if (diffSeconds > 35) {
               statusEl.innerHTML =
-                '<span style="color:red; font-weight:bold;">⚠️ ЗВ\'ЯЗОК ВТРАЧЕНО (OFFLINE)</span>';
-              // Можно визуально "погасить" карточки
+                '<span style="color:red; font-weight:bold;">⚠️ OFFLINE</span>';
               document.querySelector(".dashboard-wrapper").style.opacity =
                 "0.5";
             } else {
-              // Все ок
-              statusEl.innerHTML = '<span style="color:green;">● ONLINE</span>';
+              statusEl.innerHTML =
+                '<span style="color:#28a745;">● ONLINE</span>';
               document.querySelector(".dashboard-wrapper").style.opacity = "1";
             }
           }
-        }, 5000); // Проверяем каждые 5 секунд
-        // ==========================================
+        }, 5000);
 
+        fetchTodayStartEnergy();
+
+        // Realtime Listener
         db.collection("meter_readings")
           .orderBy("created_at", "desc")
-          .limit(50)
+          .limit(100)
           .onSnapshot(
             (snapshot) => {
-              const temps = { labels: [], power: [], voltage: [], energy: [] };
+              const temps = {
+                labels: [],
+                power: [],
+                voltage: [],
+                energy: [],
+                dailyEnergyProfile: [],
+              };
               let latestDoc = null;
 
               snapshot.forEach((doc) => {
@@ -380,25 +412,30 @@
                 const timePart = data.created_at
                   ? data.created_at.split(" ")[1]
                   : "";
+
                 temps.labels.push(timePart);
                 temps.power.push(data.power);
                 temps.voltage.push(data.voltage);
-                temps.energy.push(data.energy);
+                temps.energy.push(data.energy); // Сырые данные для общего графика
+
+                // Расчет для суточного графика
+                if (todayStartEnergy !== null) {
+                  let val = data.energy - todayStartEnergy;
+                  if (val < 0) val = 0;
+                  temps.dailyEnergyProfile.push(val.toFixed(4));
+                } else {
+                  temps.dailyEnergyProfile.push(0);
+                }
               });
 
-              // === ЗАПОМИНАЕМ ВРЕМЯ ПОСЛЕДНЕГО ПАКЕТА ДЛЯ ТАЙМЕРА ===
-              if (latestDoc) {
-                // Пытаемся распарсить строку времени обратно в объект Date
-                // Формат "YYYY-MM-DD HH:mm:ss"
-                // Самый простой способ - просто обновить локальное время JS в момент прихода пакета
-                window.lastDataTime = new Date();
-              }
-              // ======================================================
+              window.lastDataTime = new Date();
 
               cachedData.labels = temps.labels.reverse();
               cachedData.power = temps.power.reverse();
               cachedData.voltage = temps.voltage.reverse();
               cachedData.energy = temps.energy.reverse();
+              cachedData.dailyEnergyProfile =
+                temps.dailyEnergyProfile.reverse();
 
               if (latestDoc) {
                 document.getElementById("disp-voltage").innerText =
@@ -407,6 +444,17 @@
                   latestDoc.power;
                 document.getElementById("disp-energy").innerText =
                   latestDoc.energy;
+
+                // Расчет цифры "Сегодня"
+                if (todayStartEnergy !== null) {
+                  let daily = (latestDoc.energy - todayStartEnergy).toFixed(3);
+                  if (daily < 0) daily = "0.000";
+                  document.getElementById("disp-daily").innerText = daily;
+                } else {
+                  document.getElementById("disp-daily").innerText = "...";
+                  // Если старт не найден, пробуем искать снова (вдруг индексы прогрузились)
+                  if (!todayStartEnergy) fetchTodayStartEnergy();
+                }
               }
 
               updateChartData();
@@ -416,24 +464,39 @@
             }
           );
       }
-      // --- Ініціалізація ---
+
       window.addEventListener("DOMContentLoaded", async () => {
-        if (localStorage.getItem("theme") === "dark") {
+        if (localStorage.getItem("theme") === "dark")
           document.body.classList.add("dark");
-        }
         await loadComponent("sidebar-placeholder", "sidebar.html");
-        if (typeof BUILD_VERSION !== "undefined") {
+        if (typeof BUILD_VERSION !== "undefined")
           document.getElementById("buildVersion").textContent = BUILD_VERSION;
-        }
 
         auth.onAuthStateChanged((user) => {
-          if (user) {
+          if (user && db) {
             checkAdminStatus(user);
           } else {
             window.location.replace("auth.html");
           }
         });
       });
+
+      async function checkAdminStatus(user) {
+        const userRef = db.collection("users").doc(user.uid);
+        try {
+          const doc = await userRef.get();
+          if (doc.exists && doc.data().role === "admin") {
+            isAdmin = true;
+            document.getElementById("monitoring-section").style.display =
+              "block";
+            initPowerMonitor();
+          } else {
+            window.location.replace("index.html");
+          }
+        } catch (error) {
+          window.location.replace("index.html");
+        }
+      }
     </script>
   </body>
 </html>

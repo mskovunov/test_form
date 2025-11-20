@@ -5,5 +5,5 @@
   //const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwVyyh51sypiCvYZrnVRmqL3spiA4lCkdO9w1EtwpYYIdq-Hu6IUwBRtVGqbZfSgBmO/exec';    // meter_form - DEV
 
 // Номер версии сборки
-  const BUILD_VERSION = 'v2025.11.20.1959'   
+  const BUILD_VERSION = 'v2025.11.20.2059'   
   
