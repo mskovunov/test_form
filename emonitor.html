@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Моніторинг Енергії</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-N0T0138X0Q"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-N0T0138X0Q");
+    </script>
+
+    <style>
+      /* Карточки показників */
+      .dashboard-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 30px;
+        justify-content: center;
+      }
+
+      .info-card {
+        background: #fff;
+        border: 2px solid transparent; /* Для рамки при виділенні */
+        border-color: #eee;
+        border-radius: 10px;
+        padding: 15px;
+        flex: 1 1 150px;
+        min-width: 140px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        cursor: pointer; /* Курсор у вигляді руки */
+        transition: all 0.2s ease;
+      }
+
+      .info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Стиль для активної картки */
+      .info-card.active-card {
+        border-color: #007bff;
+        background-color: #f0f8ff;
+      }
+
+      .dark .info-card {
+        background: #2b2b2b;
+        border-color: #444;
+      }
+      .dark .info-card.active-card {
+        border-color: #007bff;
+        background-color: #333;
+      }
+
+      .info-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 0.9rem;
+        color: #888;
+        text-transform: uppercase;
+      }
+      .info-card .value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #333;
+      }
+      .dark .info-card .value {
+        color: #eee;
+      }
+      .info-card .unit {
+        font-size: 0.9rem;
+        color: #aaa;
+        margin-left: 4px;
+      }
+
+      /* Контейнер графіка */
+      .chart-container {
+        background: #fff;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        position: relative;
+        height: 350px;
+        width: 100%;
+      }
+      .dark .chart-container {
+        background: #2b2b2b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <button class="menu-button" onclick="toggleMenu()">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M4 6H20"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M4 12H20"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M4 18H20"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+
+      <div class="form-wrapper">
+        <div id="sidebar-placeholder"></div>
+
+        <h2>Моніторинг Енергомережі</h2>
+        <p style="text-align: center; font-size: 0.9rem; color: #888">
+          Натисніть на картку, щоб змінити графік
+        </p>
+
+        <p
+          id="admin-status"
+          style="text-align: center; margin-bottom: 20px"
+        ></p>
+
+        <div id="monitoring-section" style="display: none">
+          <div class="dashboard-wrapper">
+            <div
+              class="info-card"
+              id="card-voltage"
+              onclick="setChartMode('voltage')"
+            >
+              <h3>Напруга</h3>
+              <div class="value" style="color: #ff9800">
+                <span id="disp-voltage">--</span><span class="unit">V</span>
+              </div>
+            </div>
+            <div
+              class="info-card active-card"
+              id="card-power"
+              onclick="setChartMode('power')"
+            >
+              <h3>Потужність</h3>
+              <div class="value" style="color: #007bff">
+                <span id="disp-power">--</span><span class="unit">W</span>
+              </div>
+            </div>
+            <div
+              class="info-card"
+              id="card-energy"
+              onclick="setChartMode('energy')"
+            >
+              <h3>Лічильник</h3>
+              <div class="value" style="color: #28a745">
+                <span id="disp-energy">--</span><span class="unit">kWh</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <canvas id="powerChart"></canvas>
+          </div>
+        </div>
+        <p
+          id="buildVersion"
+          style="
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #999;
+            text-align: center;
+          "
+        ></p>
+      </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="./firebase-init.js"></script>
+    <script src="utils.js"></script>
+
+    <script>
+      // Глобальні змінні
+      let isAdmin = false;
+      let powerChart = null;
+
+      // Поточний режим графіка ('power', 'voltage', 'energy')
+      let currentMode = "power";
+
+      // Зберігаємо завантажені дані, щоб не робити запит знову при кліку
+      let cachedData = {
+        labels: [],
+        power: [],
+        voltage: [],
+        energy: [],
+      };
+
+      // Налаштування кольорів для різних режимів
+      const chartConfig = {
+        power: {
+          label: "Потужність (W)",
+          color: "rgb(0, 123, 255)",
+          bg: "rgba(0, 123, 255, 0.1)",
+        },
+        voltage: {
+          label: "Напруга (V)",
+          color: "rgb(255, 152, 0)",
+          bg: "rgba(255, 152, 0, 0.1)",
+        },
+        energy: {
+          label: "Енергія (kWh)",
+          color: "rgb(40, 167, 69)",
+          bg: "rgba(40, 167, 69, 0.1)",
+        },
+      };
+
+      // --- ФУНКЦІЯ ПЕРЕМИКАННЯ ГРАФІКА (викликається при кліку) ---
+      window.setChartMode = function (mode) {
+        currentMode = mode;
+
+        // 1. Оновлюємо стиль карток (виділення)
+        document
+          .querySelectorAll(".info-card")
+          .forEach((el) => el.classList.remove("active-card"));
+        document.getElementById(`card-${mode}`).classList.add("active-card");
+
+        // 2. Оновлюємо графік даними з кешу
+        updateChartData();
+      };
+
+      function updateChartData() {
+        if (!powerChart) return;
+
+        const cfg = chartConfig[currentMode];
+
+        // Міняємо налаштування ліній
+        powerChart.data.datasets[0].label = cfg.label;
+        powerChart.data.datasets[0].borderColor = cfg.color;
+        powerChart.data.datasets[0].backgroundColor = cfg.bg;
+
+        // Підставляємо потрібні дані з масиву
+        powerChart.data.labels = cachedData.labels; // Час однаковий для всіх
+        powerChart.data.datasets[0].data = cachedData[currentMode]; // Дані залежать від режиму
+
+        powerChart.update();
+      }
+
+      // --- ПЕРЕВІРКА АДМІНІСТРАТОРА ---
+      async function checkAdminStatus(user) {
+        if (!user || typeof db === "undefined") {
+          window.location.replace("auth.html");
+          return;
+        }
+        const userRef = db.collection("users").doc(user.uid);
+        try {
+          const doc = await userRef.get();
+          const data = doc.data();
+          if (doc.exists && data.role === "admin") {
+            isAdmin = true;
+            document.getElementById("monitoring-section").style.display =
+              "block";
+            initPowerMonitor();
+          } else {
+            alert("Доступ заборонено.");
+            window.location.replace("index.html");
+          }
+        } catch (error) {
+          console.error("Помилка перевірки ролі:", error);
+          window.location.replace("index.html");
+        }
+      }
+
+      // --- ЛОГІКА МОНІТОРИНГУ ---
+      function initPowerMonitor() {
+        const ctx = document.getElementById("powerChart").getContext("2d");
+        // ... (код создания new Chart оставляем как был) ...
+        const isDark = document.body.classList.contains("dark");
+        const gridColor = isDark ? "#444" : "#eee";
+        const textColor = isDark ? "#ccc" : "#666";
+
+        powerChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: chartConfig.power.label,
+                data: [],
+                borderColor: chartConfig.power.color,
+                backgroundColor: chartConfig.power.bg,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: "index" },
+            plugins: { legend: { labels: { color: textColor } } },
+            scales: {
+              x: { ticks: { color: textColor }, grid: { display: false } },
+              y: {
+                beginAtZero: false,
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+            },
+            animation: { duration: 0 },
+          },
+        });
+
+        // === ДОБАВЛЕН ТАЙМЕР ПРОВЕРКИ ОФФЛАЙНА ===
+        setInterval(() => {
+          const statusEl = document.getElementById("admin-status");
+          const lastUpdateEl = document.getElementById("last-update-time"); // Можно добавить такой элемент в HTML если нужно
+
+          // Если у нас есть время последнего пакета
+          if (window.lastDataTime) {
+            const now = new Date();
+            const diffSeconds = (now - window.lastDataTime) / 1000;
+
+            if (diffSeconds > 30) {
+              // Данные устарели (более 30 сек задержки)
+              statusEl.innerHTML =
+                '<span style="color:red; font-weight:bold;">⚠️ ЗВ\'ЯЗОК ВТРАЧЕНО (OFFLINE)</span>';
+              // Можно визуально "погасить" карточки
+              document.querySelector(".dashboard-wrapper").style.opacity =
+                "0.5";
+            } else {
+              // Все ок
+              statusEl.innerHTML = '<span style="color:green;">● ONLINE</span>';
+              document.querySelector(".dashboard-wrapper").style.opacity = "1";
+            }
+          }
+        }, 5000); // Проверяем каждые 5 секунд
+        // ==========================================
+
+        db.collection("meter_readings")
+          .orderBy("created_at", "desc")
+          .limit(50)
+          .onSnapshot(
+            (snapshot) => {
+              const temps = { labels: [], power: [], voltage: [], energy: [] };
+              let latestDoc = null;
+
+              snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (!latestDoc) latestDoc = data;
+
+                const timePart = data.created_at
+                  ? data.created_at.split(" ")[1]
+                  : "";
+                temps.labels.push(timePart);
+                temps.power.push(data.power);
+                temps.voltage.push(data.voltage);
+                temps.energy.push(data.energy);
+              });
+
+              // === ЗАПОМИНАЕМ ВРЕМЯ ПОСЛЕДНЕГО ПАКЕТА ДЛЯ ТАЙМЕРА ===
+              if (latestDoc) {
+                // Пытаемся распарсить строку времени обратно в объект Date
+                // Формат "YYYY-MM-DD HH:mm:ss"
+                // Самый простой способ - просто обновить локальное время JS в момент прихода пакета
+                window.lastDataTime = new Date();
+              }
+              // ======================================================
+
+              cachedData.labels = temps.labels.reverse();
+              cachedData.power = temps.power.reverse();
+              cachedData.voltage = temps.voltage.reverse();
+              cachedData.energy = temps.energy.reverse();
+
+              if (latestDoc) {
+                document.getElementById("disp-voltage").innerText =
+                  latestDoc.voltage;
+                document.getElementById("disp-power").innerText =
+                  latestDoc.power;
+                document.getElementById("disp-energy").innerText =
+                  latestDoc.energy;
+              }
+
+              updateChartData();
+            },
+            (error) => {
+              console.error("Error getting meter readings:", error);
+            }
+          );
+      }
+      // --- Ініціалізація ---
+      window.addEventListener("DOMContentLoaded", async () => {
+        if (localStorage.getItem("theme") === "dark") {
+          document.body.classList.add("dark");
+        }
+        await loadComponent("sidebar-placeholder", "sidebar.html");
+        if (typeof BUILD_VERSION !== "undefined") {
+          document.getElementById("buildVersion").textContent = BUILD_VERSION;
+        }
+
+        auth.onAuthStateChanged((user) => {
+          if (user) {
+            checkAdminStatus(user);
+          } else {
+            window.location.replace("auth.html");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
