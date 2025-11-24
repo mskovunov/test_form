@@ -11,17 +11,16 @@
 
 // ---------------- 2. НАСТРОЙКИ FIREBASE ----------------
 #define API_KEY "AIzaSyAsr-JbArcAu-7_csBxM6VDsC7hyPz7qB0"
-#define FIREBASE_PROJECT_ID "meter-form" // Например: my-home-project-123
+#define FIREBASE_PROJECT_ID "meter-form"
 
-// Данные пользователя, которого вы создали в Auth
+// Данные пользователя Auth
 #define USER_EMAIL "esp32@test.com"
 #define USER_PASSWORD "123456"
 
 // ---------------- 3. НАСТРОЙКИ ВРЕМЕНИ (NTP) ----------------
 const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 7200;  // Смещение в секундах (3600 * 3 часа = UTC+3).
-                                  // Если у вас UTC+2, ставьте 7200.
-const int daylightOffset_sec = 0; // Летнее время (0 - выключено)
+const long gmtOffset_sec = 7200;     // UTC+2 (Киев/Зимнее время)
+const int daylightOffset_sec = 3600; // Летнее время (3600 - включено)
 
 // ---------------- 4. НАСТРОЙКИ PZEM (26/27) ----------------
 #define PZEM_RX_PIN 26
@@ -36,7 +35,7 @@ FirebaseConfig config;
 unsigned long sendDataPrevMillis = 0;
 unsigned long lastConnectionTime = 0; // Время последней успешной связи
 
-// Функция получения текущего времени в формате строки
+// --- ФУНКЦИЯ ПОЛУЧЕНИЯ ВРЕМЕНИ ---
 String getCurrentTime()
 {
     struct tm timeinfo;
@@ -46,9 +45,69 @@ String getCurrentTime()
         return "Error";
     }
     char timeStringBuff[50];
-    // Формат: Год-Месяц-День Час:Минута:Секунда
     strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo);
     return String(timeStringBuff);
+}
+
+// --- ФУНКЦИЯ ОТПРАВКИ ЛОГОВ (С ВЫВОДОМ ОШИБОК) ---
+void sendLog(String message)
+{
+    if (Firebase.ready())
+    {
+        FirebaseJson content;
+
+        // Сообщение
+        content.set("fields/message/stringValue", message);
+
+        // ИСПРАВЛЕНИЕ: Вместо serverValue берем наше локальное время
+        // Так как NTP у нас уже синхронизирован в setup
+        String timeStr = getCurrentTime();
+        content.set("fields/created_at/stringValue", timeStr);
+
+        // Причина перезагрузки
+        String reason = "Unknown";
+        esp_reset_reason_t r = esp_reset_reason();
+        switch (r)
+        {
+        case ESP_RST_POWERON:
+            reason = "Power ON";
+            break;
+        case ESP_RST_SW:
+            reason = "Software Reset";
+            break;
+        case ESP_RST_PANIC:
+            reason = "Crash/Panic";
+            break;
+        case ESP_RST_BROWNOUT:
+            reason = "Brownout (Voltage dip)";
+            break;
+        case ESP_RST_WDT:
+            reason = "Watchdog";
+            break;
+        default:
+            reason = String(r);
+            break;
+        }
+        content.set("fields/reason/stringValue", reason);
+
+        String path = "system_logs";
+
+        Serial.print("Попытка записи в system_logs... ");
+
+        // Отправляем
+        if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", path.c_str(), content.raw()))
+        {
+            Serial.printf("УСПЕХ! Лог записан. ID: %s\n", fbdo.payload().c_str());
+        }
+        else
+        {
+            Serial.printf("ОШИБКА записи лога: %s\n", fbdo.errorReason().c_str());
+        }
+    }
+    else
+    {
+        Serial.println("ОШИБКА: Firebase не готов (Token not ready)");
+    }
 }
 
 void setup()
@@ -69,7 +128,6 @@ void setup()
     Serial.print("Настройка времени...");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 
-    // Ждем, пока время синхронизируется
     struct tm timeinfo;
     while (!getLocalTime(&timeinfo))
     {
@@ -88,10 +146,43 @@ void setup()
     Firebase.reconnectWiFi(true);
 
     lastConnectionTime = millis(); // Инициализируем таймер при старте
+
+    Serial.println("Инициализация Firebase...");
+
+    // Ждем готовности токена (максимум 10 секунд)
+    unsigned long startWait = millis();
+    while (!Firebase.ready() && millis() - startWait < 10000)
+    {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+
+    // Теперь отправляем лог
+    Serial.println("Отправка лога о запуске...");
+    sendLog("Запуск системи");
 }
 
 void loop()
 {
+    // === 1. ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ (ВЫНЕСЕНО В ГЛАВНЫЙ ЦИКЛ) ===
+    // Проверяем постоянно, а не раз в 15 секунд
+    if (WiFi.status() == WL_CONNECTED && Firebase.ready())
+    {
+        // Сбрасываем таймер (все хорошо)
+        lastConnectionTime = millis();
+    }
+    else
+    {
+        // Если связи нет, проверяем, как долго
+        if (millis() - lastConnectionTime > 180000)
+        { // 3 минуты
+            Serial.println("Связь потеряна более 3 минут. Выполняю перезагрузку...");
+            ESP.restart();
+        }
+    }
+
+    // === 2. ОТПРАВКА ДАННЫХ (Раз в 15 сек) ===
     if (Firebase.ready() && (millis() - sendDataPrevMillis > 15000 || sendDataPrevMillis == 0))
     {
         sendDataPrevMillis = millis();
@@ -103,10 +194,6 @@ void loop()
         float energy = pzem.energy();
 
         // === ФИЛЬТР АДЕКВАТНОСТИ ===
-        // 1. Проверка на NaN (ошибка чтения)
-        // 2. Проверка на бред (напряжение > 280В или < 0)
-        // 3. Проверка на бред (мощность > 25000Вт - это 25 кВт, в квартире так не бывает)
-
         bool isError = false;
 
         if (isnan(voltage) || voltage < 0 || voltage > 280)
@@ -118,11 +205,10 @@ void loop()
 
         if (isError)
         {
-            Serial.println("Обнаружены аномальные данные (глюк при старте). Отправляем 0.");
+            Serial.println("Обнаружены аномальные данные или обрыв. Отправляем 0.");
             voltage = 0.0;
             current = 0.0;
             power = 0.0;
-            // energy не трогаем или ставим 0, по желанию
         }
 
         // Округляем
@@ -130,24 +216,6 @@ void loop()
         double cleanCurrent = round(current * 1000) / 1000.0;
         double cleanPower = round(power * 10) / 10.0;
         double cleanEnergy = round(energy * 1000) / 1000.0;
-
-        // === ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ ===
-
-        // Если Wi-Fi подключен ИЛИ Firebase готов к работе
-        if (WiFi.status() == WL_CONNECTED && Firebase.ready())
-        {
-            // Сбрасываем таймер (все хорошо)
-            lastConnectionTime = millis();
-        }
-        else
-        {
-            // Если связи нет, проверяем, как долго
-            if (millis() - lastConnectionTime > 180000)
-            { // 180000 мс = 3 минуты
-                Serial.println("Связь потеряна более 3 минут. Выполняю перезагрузку...");
-                ESP.restart(); // <--- ЭТА КОМАНДА ПЕРЕЗАГРУЗИТ ПЛАТУ
-            }
-        }
 
         // Получаем текущее время
         String timeStr = getCurrentTime();
@@ -161,9 +229,7 @@ void loop()
         content.set("fields/power/doubleValue", cleanPower);
         content.set("fields/energy/doubleValue", cleanEnergy);
 
-        // ДОБАВЛЯЕМ ВРЕМЯ КАК СТРОКУ
         content.set("fields/created_at/stringValue", timeStr);
-        // Также полезно добавить timestamp как число (для сортировки в будущем)
         content.set("fields/timestamp_unix/integerValue", time(nullptr));
 
         // Отправка
