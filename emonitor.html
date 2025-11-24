@@ -22,7 +22,7 @@
     </script>
 
     <style>
-      /* Карточки показників */
+      /* --- КАРТОЧКИ --- */
       .dashboard-wrapper {
         display: flex;
         flex-wrap: wrap;
@@ -50,11 +50,11 @@
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
 
-      /* Активная карточка */
       .info-card.active-card {
         background-color: #f0f8ff;
-        border-color: currentColor; /* Цвет рамки берется от цвета текста */
+        border-color: currentColor;
       }
+
       .dark .info-card {
         background: #2b2b2b;
         border-color: #444;
@@ -70,21 +70,20 @@
         text-transform: uppercase;
       }
       .info-card .value {
-        font-size: 1.5rem; /* Чуть уменьшил шрифт, чтобы влезло 4 карточки */
+        font-size: 1.5rem;
         font-weight: bold;
         color: #333;
       }
       .dark .info-card .value {
         color: #eee;
       }
-
       .info-card .unit {
         font-size: 0.8rem;
         color: #aaa;
         margin-left: 4px;
       }
 
-      /* Контейнер графіка */
+      /* --- ГРАФИК --- */
       .chart-container {
         background: #fff;
         border-radius: 10px;
@@ -97,6 +96,63 @@
       }
       .dark .chart-container {
         background: #2b2b2b;
+      }
+
+      /* --- ТАБЛИЦА ЛОГОВ (Новые стили) --- */
+      .logs-container {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #eee;
+        overflow-x: auto;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+
+      th {
+        padding: 12px;
+        text-align: left;
+        background: #f8f9fa;
+        color: #666;
+        border-bottom: 2px solid #ddd;
+        font-weight: 600;
+      }
+
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #eee;
+        color: #333; /* Цвет текста по умолчанию (светлая тема) */
+      }
+
+      /* Темная тема для таблицы */
+      .dark .logs-container {
+        background: #2b2b2b;
+        border-color: #444;
+      }
+      .dark th {
+        background: #333;
+        color: #aaa;
+        border-bottom: 2px solid #444;
+      }
+      .dark td {
+        color: #ddd; /* Цвет текста в темной теме */
+        border-bottom: 1px solid #444;
+      }
+
+      /* Заголовок таблицы */
+      h3.logs-title {
+        text-align: center;
+        color: #666;
+        margin-top: 40px;
+        font-size: 1rem;
+      }
+      .dark h3.logs-title {
+        color: #aaa;
       }
     </style>
   </head>
@@ -197,6 +253,29 @@
           <div class="chart-container">
             <canvas id="powerChart"></canvas>
           </div>
+
+          <h3 class="logs-title">Журнал подій (System Logs)</h3>
+          <div class="logs-container">
+            <table id="logs-table">
+              <thead>
+                <tr>
+                  <th>Час</th>
+                  <th>Подія</th>
+                  <th>Причина</th>
+                </tr>
+              </thead>
+              <tbody id="logs-body">
+                <tr>
+                  <td
+                    colspan="3"
+                    style="text-align: center; padding: 15px; opacity: 0.7"
+                  >
+                    Завантаження...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <p
@@ -223,84 +302,74 @@
       let powerChart = null;
       let currentMode = "power";
 
-      // Для расчетов "суточного" пробега
       let todayStartEnergy = null;
 
-      // Кеш данных для графиков
       let cachedData = {
         labels: [],
         power: [],
         voltage: [],
-        energy: [], // Данные для общего счетчика
-        dailyEnergyProfile: [], // Данные для суточного графика
+        energy: [],
+        dailyEnergyProfile: [],
       };
 
-      // Конфигурация цветов для 4 режимов
-      const chartConfig = {
-        power: {
-          label: "Потужність (W)",
-          color: "rgb(0, 123, 255)",
-          bg: "rgba(0, 123, 255, 0.1)",
-        },
-        voltage: {
-          label: "Напруга (V)",
-          color: "rgb(255, 152, 0)",
-          bg: "rgba(255, 152, 0, 0.1)",
-        },
-        energy: {
-          label: "Всього накопичено (kWh)",
-          color: "rgb(111, 66, 193)",
-          bg: "rgba(111, 66, 193, 0.1)",
-        }, // Фиолетовый
-        daily: {
-          label: "Споживання сьогодні (kWh)",
-          color: "rgb(40, 167, 69)",
-          bg: "rgba(40, 167, 69, 0.1)",
-        }, // Зеленый
+      const chartColors = {
+        power: { color: "rgb(0, 123, 255)", bg: "rgba(0, 123, 255, 0.1)" },
+        voltage: { color: "rgb(255, 152, 0)", bg: "rgba(255, 152, 0, 0.1)" },
+        energy: { color: "rgb(111, 66, 193)", bg: "rgba(111, 66, 193, 0.1)" },
+        daily: { color: "rgb(40, 167, 69)", bg: "rgba(40, 167, 69, 0.1)" },
       };
 
-      // --- ПЕРЕМИКАННЯ РЕЖИМІВ ---
       window.setChartMode = function (mode) {
         currentMode = mode;
-
-        // Убираем активный класс со всех, добавляем нужному
         document
           .querySelectorAll(".info-card")
           .forEach((el) => el.classList.remove("active-card"));
         document.getElementById(`card-${mode}`).classList.add("active-card");
-
         updateChartData();
       };
 
       function updateChartData() {
         if (!powerChart) return;
-        const cfg = chartConfig[currentMode];
 
-        powerChart.data.datasets[0].label = cfg.label;
-        powerChart.data.datasets[0].borderColor = cfg.color;
-        powerChart.data.datasets[0].backgroundColor = cfg.bg;
+        const colors = chartColors[currentMode];
+        let labelText = "";
+        const todayStr = new Date().toLocaleDateString("uk-UA");
 
-        // Подставляем нужный массив данных
+        switch (currentMode) {
+          case "power":
+            labelText = "Потужність (W)";
+            break;
+          case "voltage":
+            labelText = "Напруга (V)";
+            break;
+          case "energy":
+            labelText = "Всього накопичено (Total kWh)";
+            break;
+          case "daily":
+            labelText = `Споживання за ${todayStr} (kWh)`;
+            break;
+        }
+
+        powerChart.data.datasets[0].label = labelText;
+        powerChart.data.datasets[0].borderColor = colors.color;
+        powerChart.data.datasets[0].backgroundColor = colors.bg;
+
         if (currentMode === "daily") {
           powerChart.data.datasets[0].data = cachedData.dailyEnergyProfile;
         } else {
           powerChart.data.datasets[0].data = cachedData[currentMode];
         }
 
-        // Настройка начала оси Y
-        // Для Напряжения (voltage) и Общего счетчика (energy) лучше НЕ начинать с нуля,
-        // иначе график будет прямой линией где-то вверху.
         if (currentMode === "voltage" || currentMode === "energy") {
           powerChart.options.scales.y.beginAtZero = false;
         } else {
-          powerChart.options.scales.y.beginAtZero = true; // Для Power и Daily лучше с 0
+          powerChart.options.scales.y.beginAtZero = true;
         }
 
         powerChart.data.labels = cachedData.labels;
         powerChart.update();
       }
 
-      // --- ПОИСК ДАННЫХ НА НАЧАЛО ДНЯ ---
       function fetchTodayStartEnergy() {
         const now = new Date();
         const dateString =
@@ -320,15 +389,13 @@
           .then((snapshot) => {
             if (!snapshot.empty) {
               todayStartEnergy = snapshot.docs[0].data().energy;
-              console.log("Start Energy Today:", todayStartEnergy);
             } else {
               todayStartEnergy = null;
             }
           })
-          .catch((error) => console.error("Index Error check:", error));
+          .catch((error) => console.error("Index Error:", error));
       }
 
-      // --- ГЛАВНАЯ ФУНКЦИЯ ---
       function initPowerMonitor() {
         const ctx = document.getElementById("powerChart").getContext("2d");
         const isDark = document.body.classList.contains("dark");
@@ -341,10 +408,8 @@
             labels: [],
             datasets: [
               {
-                label: chartConfig.power.label,
+                label: "Завантаження...",
                 data: [],
-                borderColor: chartConfig.power.color,
-                backgroundColor: chartConfig.power.bg,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.4,
@@ -370,7 +435,7 @@
           },
         });
 
-        // Таймер офлайна
+        // Таймер Офлайна
         setInterval(() => {
           const statusEl = document.getElementById("admin-status");
           if (window.lastDataTime) {
@@ -390,10 +455,10 @@
 
         fetchTodayStartEnergy();
 
-        // Realtime Listener
+        // 1. СЛУШАТЕЛЬ ПРИБОРА
         db.collection("meter_readings")
           .orderBy("created_at", "desc")
-          .limit(100)
+          .limit(300)
           .onSnapshot(
             (snapshot) => {
               const temps = {
@@ -409,16 +474,16 @@
                 const data = doc.data();
                 if (!latestDoc) latestDoc = data;
 
-                const timePart = data.created_at
+                const fullTime = data.created_at
                   ? data.created_at.split(" ")[1]
                   : "";
+                const shortTime = fullTime.substring(0, 5);
 
-                temps.labels.push(timePart);
+                temps.labels.push(shortTime);
                 temps.power.push(data.power);
                 temps.voltage.push(data.voltage);
-                temps.energy.push(data.energy); // Сырые данные для общего графика
+                temps.energy.push(data.energy);
 
-                // Расчет для суточного графика
                 if (todayStartEnergy !== null) {
                   let val = data.energy - todayStartEnergy;
                   if (val < 0) val = 0;
@@ -429,7 +494,6 @@
               });
 
               window.lastDataTime = new Date();
-
               cachedData.labels = temps.labels.reverse();
               cachedData.power = temps.power.reverse();
               cachedData.voltage = temps.voltage.reverse();
@@ -445,24 +509,69 @@
                 document.getElementById("disp-energy").innerText =
                   latestDoc.energy;
 
-                // Расчет цифры "Сегодня"
                 if (todayStartEnergy !== null) {
                   let daily = (latestDoc.energy - todayStartEnergy).toFixed(3);
                   if (daily < 0) daily = "0.000";
                   document.getElementById("disp-daily").innerText = daily;
                 } else {
                   document.getElementById("disp-daily").innerText = "...";
-                  // Если старт не найден, пробуем искать снова (вдруг индексы прогрузились)
                   if (!todayStartEnergy) fetchTodayStartEnergy();
                 }
               }
-
               updateChartData();
             },
             (error) => {
-              console.error("Error getting meter readings:", error);
+              console.error("Error readings:", error);
             }
           );
+
+        // 2. СЛУШАТЕЛЬ ЖУРНАЛА (ИСПРАВЛЕННЫЙ ЦВЕТ ШРИФТА)
+        db.collection("system_logs")
+          .orderBy("created_at", "desc")
+          .limit(10)
+          .onSnapshot((snapshot) => {
+            const tbody = document.getElementById("logs-body");
+            tbody.innerHTML = "";
+
+            if (snapshot.empty) {
+              tbody.innerHTML =
+                "<tr><td colspan='3' style='text-align:center; padding:15px; opacity:0.5;'>Журнал порожній</td></tr>";
+              return;
+            }
+
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              let dateStr = data.created_at || "---";
+
+              let reasonColor = "inherit"; // Используем наследование цвета от CSS (белый/черный)
+              let reasonWeight = "normal";
+
+              const r = data.reason || "";
+              if (r.includes("Power ON")) {
+                reasonColor = "#28a745";
+                reasonWeight = "bold";
+              } // Зеленый
+              if (r.includes("Watchdog") || r.includes("Reset")) {
+                reasonColor = "#dc3545";
+                reasonWeight = "bold";
+              } // Красный
+              if (r.includes("Brownout")) {
+                reasonColor = "#fd7e14";
+                reasonWeight = "bold";
+              } // Оранжевый
+
+              const row = `
+                        <tr>
+                            <td style="font-family: monospace; opacity: 0.8;">${dateStr}</td>
+                            <td style="font-weight: 500;">${
+                              data.message || "---"
+                            }</td>
+                            <td style="color: ${reasonColor}; font-weight: ${reasonWeight};">${r}</td>
+                        </tr>
+                    `;
+              tbody.innerHTML += row;
+            });
+          });
       }
 
       window.addEventListener("DOMContentLoaded", async () => {
