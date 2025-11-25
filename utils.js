@@ -23,12 +23,12 @@ async function loadComponent(targetId, filePath) {
     }
 }
 
-    function toggleTheme() {
+function toggleTheme() {
       const isDark = document.body.classList.toggle('dark');
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
 
-    		function toggleMenu() {
+function toggleMenu() {
 	  const menu = document.getElementById("sideMenu");
 	  menu.classList.toggle("open");
 	}
@@ -159,3 +159,16 @@ async function loadComponent(targetId, filePath) {
 		    closeWebView();
 		}
 	
+		// --- Закрытие меню при клике вне его области ---
+document.addEventListener('click', function(event) {
+    const sideMenu = document.getElementById('sideMenu');
+    const menuBtn = document.querySelector('.menu-button');
+
+    // Если меню не найдено (еще не загрузилось) или оно закрыто — ничего не делаем
+    if (!sideMenu || !sideMenu.classList.contains('open')) return;
+
+    // Проверяем: клик был НЕ внутри меню И НЕ по кнопке открытия?
+    if (!sideMenu.contains(event.target) && !menuBtn.contains(event.target)) {
+        toggleMenu(); // Вызываем функцию закрытия
+    }
+});
