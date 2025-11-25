@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
 
     <script
       async
@@ -90,7 +92,7 @@
         padding: 15px;
         margin-bottom: 30px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        position: relative;
+        position: relative; /* Важно для кнопки зума */
         height: 350px;
         width: 100%;
       }
@@ -98,7 +100,80 @@
         background: #2b2b2b;
       }
 
-      /* --- ТАБЛИЦА ЛОГОВ (Новые стили) --- */
+      /* --- КНОПКИ ДИАПАЗОНА --- */
+      .range-selector {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .range-btn {
+        background: #f1f1f1;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #666;
+        transition: background 0.2s;
+      }
+
+      .range-btn:hover {
+        background: #e2e2e2;
+      }
+
+      .range-btn.active {
+        background: #007bff;
+        color: white;
+      }
+
+      .dark .range-btn {
+        background: #333;
+        color: #aaa;
+      }
+      .dark .range-btn.active {
+        background: #007bff;
+        color: white;
+      }
+
+      /* --- КНОПКА СБРОСА ЗУМА (ОБНОВЛЕННЫЙ СТИЛЬ) --- */
+      .reset-zoom-btn {
+        position: absolute;
+        top: 10px;
+        right: 30px;
+        z-index: 20;
+
+        /* Стиль скопирован с .range-btn */
+        background: #f1f1f1;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        color: #666;
+        transition: background 0.2s;
+
+        /* Дополнительно, чтобы не растягивалась */
+        width: auto;
+        display: inline-block;
+        box-shadow: none; /* Убираем тень, чтобы было как у range-btn */
+      }
+
+      .reset-zoom-btn:hover {
+        background: #e2e2e2;
+      }
+
+      /* Темная тема для кнопки зума */
+      .dark .reset-zoom-btn {
+        background: #333;
+        color: #aaa;
+      }
+      .dark .reset-zoom-btn:hover {
+        background: #444;
+      }
+
+      /* --- ТАБЛИЦА ЛОГОВ --- */
       .logs-container {
         background: #fff;
         border-radius: 10px;
@@ -126,10 +201,9 @@
       td {
         padding: 10px 12px;
         border-bottom: 1px solid #eee;
-        color: #333; /* Цвет текста по умолчанию (светлая тема) */
+        color: #333;
       }
 
-      /* Темная тема для таблицы */
       .dark .logs-container {
         background: #2b2b2b;
         border-color: #444;
@@ -140,11 +214,10 @@
         border-bottom: 2px solid #444;
       }
       .dark td {
-        color: #ddd; /* Цвет текста в темной теме */
+        color: #ddd;
         border-bottom: 1px solid #444;
       }
 
-      /* Заголовок таблицы */
       h3.logs-title {
         text-align: center;
         color: #666;
@@ -250,8 +323,26 @@
             </div>
           </div>
 
+          <div class="range-selector">
+            <button class="range-btn active" onclick="changeRange(250, this)">
+              1 год
+            </button>
+            <button class="range-btn" onclick="changeRange(750, this)">
+              3 год
+            </button>
+            <button class="range-btn" onclick="changeRange(1500, this)">
+              6 год
+            </button>
+            <button class="range-btn" onclick="changeRange(3000, this)">
+              12 год
+            </button>
+          </div>
+
           <div class="chart-container">
             <canvas id="powerChart"></canvas>
+            <button class="reset-zoom-btn" onclick="powerChart.resetZoom()">
+              ⟲ Zoom
+            </button>
           </div>
 
           <h3 class="logs-title">Журнал подій (System Logs)</h3>
@@ -301,8 +392,9 @@
       let isAdmin = false;
       let powerChart = null;
       let currentMode = "power";
-
       let todayStartEnergy = null;
+      let unsubscribeMeter = null;
+      let currentLimit = 250;
 
       let cachedData = {
         labels: [],
@@ -317,6 +409,21 @@
         voltage: { color: "rgb(255, 152, 0)", bg: "rgba(255, 152, 0, 0.1)" },
         energy: { color: "rgb(111, 66, 193)", bg: "rgba(111, 66, 193, 0.1)" },
         daily: { color: "rgb(40, 167, 69)", bg: "rgba(40, 167, 69, 0.1)" },
+      };
+
+      window.changeRange = function (limit, btn) {
+        document
+          .querySelectorAll(".range-btn")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentLimit = limit;
+
+        if (unsubscribeMeter) {
+          unsubscribeMeter();
+          unsubscribeMeter = null;
+        }
+        startMeterListener();
+        if (powerChart) powerChart.resetZoom();
       };
 
       window.setChartMode = function (mode) {
@@ -378,7 +485,6 @@
           String(now.getMonth() + 1).padStart(2, "0") +
           "-" +
           String(now.getDate()).padStart(2, "0");
-
         const startOfDayStr = dateString + " 00:00:00";
 
         db.collection("meter_readings")
@@ -396,69 +502,12 @@
           .catch((error) => console.error("Index Error:", error));
       }
 
-      function initPowerMonitor() {
-        const ctx = document.getElementById("powerChart").getContext("2d");
-        const isDark = document.body.classList.contains("dark");
-        const gridColor = isDark ? "#444" : "#eee";
-        const textColor = isDark ? "#ccc" : "#666";
-
-        powerChart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: [],
-            datasets: [
-              {
-                label: "Завантаження...",
-                data: [],
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: "index" },
-            plugins: { legend: { labels: { color: textColor } } },
-            scales: {
-              x: { ticks: { color: textColor }, grid: { display: false } },
-              y: {
-                beginAtZero: true,
-                ticks: { color: textColor },
-                grid: { color: gridColor },
-              },
-            },
-            animation: { duration: 0 },
-          },
-        });
-
-        // Таймер Офлайна
-        setInterval(() => {
-          const statusEl = document.getElementById("admin-status");
-          if (window.lastDataTime) {
-            const diffSeconds = (new Date() - window.lastDataTime) / 1000;
-            if (diffSeconds > 35) {
-              statusEl.innerHTML =
-                '<span style="color:red; font-weight:bold;">⚠️ OFFLINE</span>';
-              document.querySelector(".dashboard-wrapper").style.opacity =
-                "0.5";
-            } else {
-              statusEl.innerHTML =
-                '<span style="color:#28a745;">● ONLINE</span>';
-              document.querySelector(".dashboard-wrapper").style.opacity = "1";
-            }
-          }
-        }, 5000);
-
-        fetchTodayStartEnergy();
-
-        // 1. СЛУШАТЕЛЬ ПРИБОРА
-        db.collection("meter_readings")
+      function startMeterListener() {
+        console.log("Subscribing with limit:", currentLimit);
+        unsubscribeMeter = db
+          .collection("meter_readings")
           .orderBy("created_at", "desc")
-          .limit(300)
+          .limit(currentLimit)
           .onSnapshot(
             (snapshot) => {
               const temps = {
@@ -473,7 +522,6 @@
               snapshot.forEach((doc) => {
                 const data = doc.data();
                 if (!latestDoc) latestDoc = data;
-
                 const fullTime = data.created_at
                   ? data.created_at.split(" ")[1]
                   : "";
@@ -524,51 +572,111 @@
               console.error("Error readings:", error);
             }
           );
+      }
 
-        // 2. СЛУШАТЕЛЬ ЖУРНАЛА (ИСПРАВЛЕННЫЙ ЦВЕТ ШРИФТА)
+      function initPowerMonitor() {
+        const ctx = document.getElementById("powerChart").getContext("2d");
+        const isDark = document.body.classList.contains("dark");
+        const gridColor = isDark ? "#444" : "#eee";
+        const textColor = isDark ? "#ccc" : "#666";
+
+        powerChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Завантаження...",
+                data: [],
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: "index" },
+            plugins: {
+              legend: { labels: { color: textColor } },
+              zoom: {
+                pan: { enabled: true, mode: "x" },
+                zoom: {
+                  wheel: { enabled: true },
+                  pinch: { enabled: true },
+                  mode: "x",
+                },
+              },
+            },
+            scales: {
+              x: { ticks: { color: textColor }, grid: { display: false } },
+              y: {
+                beginAtZero: true,
+                ticks: { color: textColor },
+                grid: { color: gridColor },
+              },
+            },
+            animation: { duration: 0 },
+          },
+        });
+
+        setInterval(() => {
+          const statusEl = document.getElementById("admin-status");
+          if (window.lastDataTime) {
+            const diffSeconds = (new Date() - window.lastDataTime) / 1000;
+            if (diffSeconds > 35) {
+              statusEl.innerHTML =
+                '<span style="color:red; font-weight:bold;">⚠️ OFFLINE</span>';
+              document.querySelector(".dashboard-wrapper").style.opacity =
+                "0.5";
+            } else {
+              statusEl.innerHTML =
+                '<span style="color:#28a745;">● ONLINE</span>';
+              document.querySelector(".dashboard-wrapper").style.opacity = "1";
+            }
+          }
+        }, 5000);
+
+        fetchTodayStartEnergy();
+        startMeterListener();
+
         db.collection("system_logs")
           .orderBy("created_at", "desc")
           .limit(10)
           .onSnapshot((snapshot) => {
             const tbody = document.getElementById("logs-body");
             tbody.innerHTML = "";
-
             if (snapshot.empty) {
               tbody.innerHTML =
                 "<tr><td colspan='3' style='text-align:center; padding:15px; opacity:0.5;'>Журнал порожній</td></tr>";
               return;
             }
-
             snapshot.forEach((doc) => {
               const data = doc.data();
               let dateStr = data.created_at || "---";
-
-              let reasonColor = "inherit"; // Используем наследование цвета от CSS (белый/черный)
+              let reasonColor = "inherit";
               let reasonWeight = "normal";
-
               const r = data.reason || "";
               if (r.includes("Power ON")) {
                 reasonColor = "#28a745";
                 reasonWeight = "bold";
-              } // Зеленый
+              }
               if (r.includes("Watchdog") || r.includes("Reset")) {
                 reasonColor = "#dc3545";
                 reasonWeight = "bold";
-              } // Красный
+              }
               if (r.includes("Brownout")) {
                 reasonColor = "#fd7e14";
                 reasonWeight = "bold";
-              } // Оранжевый
-
-              const row = `
-                        <tr>
-                            <td style="font-family: monospace; opacity: 0.8;">${dateStr}</td>
-                            <td style="font-weight: 500;">${
-                              data.message || "---"
-                            }</td>
-                            <td style="color: ${reasonColor}; font-weight: ${reasonWeight};">${r}</td>
-                        </tr>
-                    `;
+              }
+              const row = `<tr>
+                    <td style="font-family: monospace; opacity: 0.8;">${dateStr}</td>
+                    <td style="font-weight: 500;">${data.message || "---"}</td>
+                    <td style="color: ${reasonColor}; font-weight: ${reasonWeight};">${r}</td>
+                </tr>`;
               tbody.innerHTML += row;
             });
           });
@@ -580,7 +688,6 @@
         await loadComponent("sidebar-placeholder", "sidebar.html");
         if (typeof BUILD_VERSION !== "undefined")
           document.getElementById("buildVersion").textContent = BUILD_VERSION;
-
         auth.onAuthStateChanged((user) => {
           if (user && db) {
             checkAdminStatus(user);
