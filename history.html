@@ -17,7 +17,9 @@
     <script>
       // Список месяцев, на основе Ваших данных за 2025 год
       const MONTHS = [
-        { value: "2025-10", text: "Жовтень 2025" }, // <--- ДОБАВЛЕНО
+        { value: "2025-12", text: "Грудень 2025" },
+        { value: "2025-11", text: "Листопад 2025" },
+        { value: "2025-10", text: "Жовтень 2025" },
         { value: "2025-09", text: "Вересень 2025" },
         { value: "2025-08", text: "Серпень 2025" },
         { value: "2025-07", text: "Липень 2025" },
@@ -52,7 +54,11 @@
         const monthName =
           monthSelector.options[monthSelector.selectedIndex].text;
 
-        statusDiv.innerHTML = `⏳ Завантаження історії за ${monthName}...`;
+        // ВИПРАВЛЕНО: Замість пісочного годинника використовуємо HTML-спіннер
+        statusDiv.innerHTML = `<span class="inline-spinner-wrapper">
+                                 <span class="inline-spinner"></span> 
+                                 Завантаження історії за ${monthName}...
+                               </span>`;
         statusDiv.style.display = "block";
         historyDiv.innerHTML = "";
 
