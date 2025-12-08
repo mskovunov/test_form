@@ -127,7 +127,6 @@ void setup()
     // 2. Настройка времени (NTP)
     Serial.print("Настройка времени...");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
     struct tm timeinfo;
     while (!getLocalTime(&timeinfo))
     {
@@ -136,7 +135,6 @@ void setup()
     }
     Serial.println("\nВремя синхронизировано: " + getCurrentTime());
 
-    // 3. Настройка Firebase
     config.api_key = API_KEY;
     auth.user.email = USER_EMAIL;
     auth.user.password = USER_PASSWORD;
