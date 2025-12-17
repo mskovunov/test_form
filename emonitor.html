@@ -511,6 +511,18 @@
           .then((snapshot) => {
             if (!snapshot.empty)
               todayStartEnergy = snapshot.docs[0].data().energy;
+            // === ПРАВКА: Сразу обновляем цифру на экране, не ожидая 60 сек ===
+            const currentTotalStr =
+              document.getElementById("disp-energy").innerText;
+            if (
+              currentTotalStr !== "--" &&
+              !isNaN(parseFloat(currentTotalStr))
+            ) {
+              let val = parseFloat(currentTotalStr) - todayStartEnergy;
+              if (val < 0) val = 0;
+              document.getElementById("disp-daily").innerText = val.toFixed(3);
+            }
+            // ================================================================
             else todayStartEnergy = null;
           })
           .catch((error) => console.error("Index Error:", error));
@@ -758,6 +770,9 @@
             if (adminMenuItem) adminMenuItem.style.display = "block";
             initPowerMonitor();
             initLogs();
+            // Запускаем получение данных сразу при загрузке
+            startMeterListener();
+            fetchTodayStartEnergy(); // Грузим данные на начало дня
           } else {
             window.location.replace("index.html");
           }
