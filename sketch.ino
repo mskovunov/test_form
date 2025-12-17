@@ -1,9 +1,10 @@
 #include <WiFi.h>
 #include <PZEM004Tv30.h>
 #include <Firebase_ESP_Client.h>
-
-// Вспомогательные файлы для генерации токенов
 #include <addons/TokenHelper.h>
+
+// 1. ПОДКЛЮЧАЕМ СТОРОЖЕВОЙ ТАЙМЕР
+#include <esp_task_wdt.h>
 
 // ---------------- 1. НАСТРОЙКИ WIFI ----------------
 #define WIFI_SSID "Xiaomi_9D58"
@@ -27,6 +28,9 @@ const int daylightOffset_sec = 3600; // Летнее время (3600 - вклю
 #define PZEM_TX_PIN 27
 #define PZEM_SERIAL Serial2
 
+// 2. ТАЙМАУТ ЗАВИСАНИЯ (30 секунд)
+#define WDT_TIMEOUT 30
+
 PZEM004Tv30 pzem(PZEM_SERIAL, PZEM_RX_PIN, PZEM_TX_PIN);
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -49,40 +53,44 @@ String getCurrentTime()
     return String(timeStringBuff);
 }
 
-// --- ФУНКЦИЯ ОТПРАВКИ ЛОГОВ (С ВЫВОДОМ ОШИБОК) ---
+// --- ФУНКЦИЯ ОТПРАВКИ ЛОГОВ ---
+// --- ФУНКЦИЯ ОТПРАВКИ ЛОГОВ ---
 void sendLog(String message)
 {
     if (Firebase.ready())
     {
         FirebaseJson content;
-
-        // Сообщение
         content.set("fields/message/stringValue", message);
-
-        // ИСПРАВЛЕНИЕ: Вместо serverValue берем наше локальное время
-        // Так как NTP у нас уже синхронизирован в setup
         String timeStr = getCurrentTime();
         content.set("fields/created_at/stringValue", timeStr);
 
-        // Причина перезагрузки
         String reason = "Unknown";
         esp_reset_reason_t r = esp_reset_reason();
         switch (r)
         {
         case ESP_RST_POWERON:
-            reason = "Power ON";
+            reason = "Power ON (Живлення)";
             break;
+        case ESP_RST_EXT:
+            reason = "External Reset (Кнопка)";
+            break; // <--- ДОБАВИЛ
         case ESP_RST_SW:
-            reason = "Software Reset";
+            reason = "Software Reset (Код)";
             break;
         case ESP_RST_PANIC:
-            reason = "Crash/Panic";
+            reason = "Crash/Panic (Помилка)";
             break;
         case ESP_RST_BROWNOUT:
-            reason = "Brownout (Voltage dip)";
+            reason = "Brownout (Напруга)";
+            break;
+        case ESP_RST_INT_WDT:
+            reason = "Int. Watchdog";
+            break;
+        case ESP_RST_TASK_WDT:
+            reason = "Task Watchdog (Зависання)";
             break;
         case ESP_RST_WDT:
-            reason = "Watchdog";
+            reason = "Other Watchdog";
             break;
         default:
             reason = String(r);
@@ -91,10 +99,7 @@ void sendLog(String message)
         content.set("fields/reason/stringValue", reason);
 
         String path = "system_logs";
-
         Serial.print("Попытка записи в system_logs... ");
-
-        // Отправляем
         if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", path.c_str(), content.raw()))
         {
             Serial.printf("УСПЕХ! Лог записан. ID: %s\n", fbdo.payload().c_str());
@@ -106,7 +111,7 @@ void sendLog(String message)
     }
     else
     {
-        Serial.println("ОШИБКА: Firebase не готов (Token not ready)");
+        Serial.println("ОШИБКА: Firebase не готов");
     }
 }
 
@@ -114,24 +119,38 @@ void setup()
 {
     Serial.begin(115200);
 
+    Serial.println("Configuring WDT...");
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = WDT_TIMEOUT * 1000,
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1,
+        .trigger_panic = true};
+    esp_task_wdt_init(&wdt_config);
+    esp_task_wdt_add(NULL);
+
     // 1. Подключение WiFi
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     Serial.print("Подключение к Wi-Fi");
+
+    // <--- ПРАВКА ЗДЕСЬ: Добавили сброс таймера в цикл ожидания
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(".");
         delay(300);
+        esp_task_wdt_reset(); // <--- КОРМИМ СОБАКУ, ПОКА ЖДЕМ WI-FI
     }
     Serial.println("\nWiFi подключен!");
 
-    // 2. Настройка времени (NTP)
+    // 2. Настройка времени
     Serial.print("Настройка времени...");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
     struct tm timeinfo;
+    // <--- ПРАВКА ЗДЕСЬ: Добавили сброс таймера в цикл ожидания
     while (!getLocalTime(&timeinfo))
     {
         Serial.print(".");
         delay(100);
+        esp_task_wdt_reset(); // <--- КОРМИМ СОБАКУ, ПОКА ЖДЕМ ВРЕМЯ
     }
     Serial.println("\nВремя синхронизировано: " + getCurrentTime());
 
@@ -143,36 +162,34 @@ void setup()
     Firebase.begin(&config, &auth);
     Firebase.reconnectWiFi(true);
 
-    lastConnectionTime = millis(); // Инициализируем таймер при старте
+    lastConnectionTime = millis();
 
     Serial.println("Инициализация Firebase...");
-
-    // Ждем готовности токена (максимум 10 секунд)
     unsigned long startWait = millis();
     while (!Firebase.ready() && millis() - startWait < 10000)
     {
         delay(500);
         Serial.print(".");
+        esp_task_wdt_reset(); // Тут уже было, все ок
     }
     Serial.println();
 
-    // Теперь отправляем лог
     Serial.println("Отправка лога о запуске...");
     sendLog("Запуск системи");
 }
 
 void loop()
 {
-    // === 1. ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ (ВЫНЕСЕНО В ГЛАВНЫЙ ЦИКЛ) ===
-    // Проверяем постоянно, а не раз в 15 секунд
+    // 5. КОРМИМ СОБАКУ (Если этот код не сработает 30 сек — будет ребут)
+    esp_task_wdt_reset();
+
+    // === 1. ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ ===
     if (WiFi.status() == WL_CONNECTED && Firebase.ready())
     {
-        // Сбрасываем таймер (все хорошо)
         lastConnectionTime = millis();
     }
     else
     {
-        // Если связи нет, проверяем, как долго
         if (millis() - lastConnectionTime > 180000)
         { // 3 минуты
             Serial.println("Связь потеряна более 3 минут. Выполняю перезагрузку...");
@@ -185,7 +202,6 @@ void loop()
     {
         sendDataPrevMillis = millis();
 
-        // Считываем данные
         float voltage = pzem.voltage();
         float current = pzem.current();
         float power = pzem.power();
@@ -193,7 +209,6 @@ void loop()
 
         // === ФИЛЬТР АДЕКВАТНОСТИ ===
         bool isError = false;
-
         if (isnan(voltage) || voltage < 0 || voltage > 280)
             isError = true;
         if (isnan(power) || power < 0 || power > 25000)
@@ -209,18 +224,15 @@ void loop()
             power = 0.0;
         }
 
-        // Округляем
         double cleanVoltage = round(voltage * 10) / 10.0;
         double cleanCurrent = round(current * 1000) / 1000.0;
         double cleanPower = round(power * 10) / 10.0;
         double cleanEnergy = round(energy * 1000) / 1000.0;
 
-        // Получаем текущее время
         String timeStr = getCurrentTime();
 
         Serial.printf("[%s] V: %.1f, P: %.1f\n", timeStr.c_str(), cleanVoltage, cleanPower);
 
-        // Формируем JSON
         FirebaseJson content;
         content.set("fields/voltage/doubleValue", cleanVoltage);
         content.set("fields/current/doubleValue", cleanCurrent);
@@ -230,7 +242,6 @@ void loop()
         content.set("fields/created_at/stringValue", timeStr);
         content.set("fields/timestamp_unix/integerValue", time(nullptr));
 
-        // Отправка
         String documentPath = "meter_readings";
         if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw()))
         {
