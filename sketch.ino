@@ -119,6 +119,7 @@ void setup()
 {
     Serial.begin(115200);
 
+    // РЕКОМЕНДАЦІЯ: Краще змінити define зверху на 120, але працюватиме і так
     Serial.println("Configuring WDT...");
     esp_task_wdt_config_t wdt_config = {
         .timeout_ms = WDT_TIMEOUT * 1000,
@@ -170,12 +171,16 @@ void setup()
     {
         delay(500);
         Serial.print(".");
-        esp_task_wdt_reset(); // Тут уже было, все ок
+        esp_task_wdt_reset();
     }
     Serial.println();
 
     Serial.println("Отправка лога о запуске...");
     sendLog("Запуск системи");
+
+    // !!! ВАЖЛИВО: ОСЬ ЦЕЙ РЯДОК ВИ ЗАБУЛИ !!!
+    // Це змушує loop() чекати 60 секунд перед першою відправкою даних
+    sendDataPrevMillis = millis();
 }
 
 void loop()
