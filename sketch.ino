@@ -29,7 +29,7 @@ const int daylightOffset_sec = 3600; // Летнее время (3600 - вклю
 #define PZEM_SERIAL Serial2
 
 // 2. ТАЙМАУТ ЗАВИСАНИЯ (60 секунд)
-#define WDT_TIMEOUT 60
+#define WDT_TIMEOUT 120
 
 PZEM004Tv30 pzem(PZEM_SERIAL, PZEM_RX_PIN, PZEM_TX_PIN);
 FirebaseData fbdo;
@@ -206,7 +206,7 @@ void loop()
     // === 3. ОТПРАВКА ДАННЫХ (Раз в 15 сек) ===
     // ВАЖНО: Добавили проверку wifiConnected && ...
     // Мы не лезем в Firebase.ready(), если нет сети — это спасает от зависаний библиотеки
-    if (wifiConnected && Firebase.ready() && (millis() - sendDataPrevMillis > 15000 || sendDataPrevMillis == 0))
+    if (wifiConnected && Firebase.ready() && (millis() - sendDataPrevMillis > 60000 || sendDataPrevMillis == 0))
     {
 
         // Еще раз кормим собаку перед тяжелой задачей
