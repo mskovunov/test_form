@@ -28,8 +28,8 @@ const int daylightOffset_sec = 3600; // Летнее время (3600 - вклю
 #define PZEM_TX_PIN 27
 #define PZEM_SERIAL Serial2
 
-// 2. ТАЙМАУТ ЗАВИСАНИЯ (30 секунд)
-#define WDT_TIMEOUT 30
+// 2. ТАЙМАУТ ЗАВИСАНИЯ (60 секунд)
+#define WDT_TIMEOUT 60
 
 PZEM004Tv30 pzem(PZEM_SERIAL, PZEM_RX_PIN, PZEM_TX_PIN);
 FirebaseData fbdo;
@@ -180,26 +180,38 @@ void setup()
 
 void loop()
 {
-    // 5. КОРМИМ СОБАКУ (Если этот код не сработает 30 сек — будет ребут)
+    // 1. КОРМИМ СОБАКУ
+    // Делаем это в самом начале
     esp_task_wdt_reset();
 
-    // === 1. ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ ===
-    if (WiFi.status() == WL_CONNECTED && Firebase.ready())
+    // Проверяем статус Wi-Fi
+    bool wifiConnected = (WiFi.status() == WL_CONNECTED);
+
+    // === 2. ПРОВЕРКА СВЯЗИ И АВТОРЕБУТ ===
+    // Если Wi-Fi есть - обновляем таймер "жизни"
+    if (wifiConnected)
     {
         lastConnectionTime = millis();
     }
     else
     {
+        // Если Wi-Fi нет, проверяем, как долго
         if (millis() - lastConnectionTime > 180000)
-        { // 3 минуты
-            Serial.println("Связь потеряна более 3 минут. Выполняю перезагрузку...");
+        { // 3 минуты нет сети
+            Serial.println("Связь потеряна > 3 мин. Жесткая перезагрузка...");
             ESP.restart();
         }
     }
 
-    // === 2. ОТПРАВКА ДАННЫХ (Раз в 15 сек) ===
-    if (Firebase.ready() && (millis() - sendDataPrevMillis > 15000 || sendDataPrevMillis == 0))
+    // === 3. ОТПРАВКА ДАННЫХ (Раз в 15 сек) ===
+    // ВАЖНО: Добавили проверку wifiConnected && ...
+    // Мы не лезем в Firebase.ready(), если нет сети — это спасает от зависаний библиотеки
+    if (wifiConnected && Firebase.ready() && (millis() - sendDataPrevMillis > 15000 || sendDataPrevMillis == 0))
     {
+
+        // Еще раз кормим собаку перед тяжелой задачей
+        esp_task_wdt_reset();
+
         sendDataPrevMillis = millis();
 
         float voltage = pzem.voltage();
@@ -218,7 +230,7 @@ void loop()
 
         if (isError)
         {
-            Serial.println("Обнаружены аномальные данные или обрыв. Отправляем 0.");
+            Serial.println("Аномальные данные. Отправляем 0.");
             voltage = 0.0;
             current = 0.0;
             power = 0.0;
@@ -238,11 +250,12 @@ void loop()
         content.set("fields/current/doubleValue", cleanCurrent);
         content.set("fields/power/doubleValue", cleanPower);
         content.set("fields/energy/doubleValue", cleanEnergy);
-
         content.set("fields/created_at/stringValue", timeStr);
         content.set("fields/timestamp_unix/integerValue", time(nullptr));
 
         String documentPath = "meter_readings";
+
+        // Отправка (может занять 2-5 секунд)
         if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw()))
         {
             Serial.printf("Отправлено! ID: %s\n", fbdo.payload().c_str());
@@ -251,5 +264,8 @@ void loop()
         {
             Serial.printf("Ошибка: %s\n", fbdo.errorReason().c_str());
         }
+
+        // Кормим собаку сразу после отправки, чтобы сбросить таймер
+        esp_task_wdt_reset();
     }
 }

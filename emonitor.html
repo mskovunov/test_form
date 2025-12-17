@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Моніторинг Енергії</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="emonitor.css" />
 
@@ -32,26 +33,11 @@
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          stroke="currentColor"
+          stroke-width="2"
         >
           <path
-            d="M4 6H20"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <path
-            d="M4 12H20"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <path
-            d="M4 18H20"
-            stroke="currentColor"
-            stroke-width="2"
+            d="M4 6H20M4 12H20M4 18H20"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
@@ -65,7 +51,7 @@
         <button
           id="logout-inline-button"
           onclick="handleLogout()"
-          title="Вийти з облікового запису"
+          title="Вийти"
         >
           <svg
             width="18"
@@ -74,8 +60,6 @@
             fill="none"
             stroke="currentColor"
             stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
           >
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
             <polyline points="16 17 21 12 16 7"></polyline>
@@ -84,7 +68,7 @@
         </button>
       </div>
 
-      <div class="form-wrapper">
+      <div class="form-wrapper monitor-view">
         <div id="sidebar-placeholder"></div>
 
         <h2>Моніторинг Енергомережі</h2>
@@ -144,18 +128,52 @@
             </div>
           </div>
 
-          <div class="range-selector">
-            <button class="range-btn active" onclick="changeRange(250, this)">
+          <div id="range-selector-standard" class="range-selector">
+            <button
+              class="range-btn active"
+              onclick="changeRange('standard', 250, this)"
+            >
               1 год
             </button>
-            <button class="range-btn" onclick="changeRange(750, this)">
+            <button
+              class="range-btn"
+              onclick="changeRange('standard', 750, this)"
+            >
               3 год
             </button>
-            <button class="range-btn" onclick="changeRange(1500, this)">
+            <button
+              class="range-btn"
+              onclick="changeRange('standard', 1500, this)"
+            >
               6 год
             </button>
-            <button class="range-btn" onclick="changeRange(3000, this)">
+            <button
+              class="range-btn"
+              onclick="changeRange('standard', 3000, this)"
+            >
               12 год
+            </button>
+          </div>
+
+          <div
+            id="range-selector-history"
+            class="range-selector"
+            style="display: none"
+          >
+            <button
+              class="range-btn active"
+              onclick="changeRange('day', 5000, this)"
+            >
+              День
+            </button>
+            <button class="range-btn" onclick="changeRange('week', 9900, this)">
+              Тиждень
+            </button>
+            <button
+              class="range-btn"
+              onclick="changeRange('month', 9900, this)"
+            >
+              Місяць
             </button>
           </div>
 
@@ -213,12 +231,14 @@
       let isAdmin = false;
       let powerChart = null;
       let currentMode = "power";
+      let currentRangeType = "standard"; // 'standard', 'day', 'week', 'month'
       let todayStartEnergy = null;
       let unsubscribeMeter = null;
       let currentLimit = 250;
 
       let cachedData = {
         labels: [],
+        fullDates: [],
         power: [],
         voltage: [],
         energy: [],
@@ -228,16 +248,57 @@
       const chartColors = {
         power: { color: "rgb(0, 123, 255)", bg: "rgba(0, 123, 255, 0.1)" },
         voltage: { color: "rgb(255, 152, 0)", bg: "rgba(255, 152, 0, 0.1)" },
-        energy: { color: "rgb(111, 66, 193)", bg: "rgba(111, 66, 193, 0.1)" },
+        energy: { color: "rgb(111, 66, 193)", bg: "rgba(111, 66, 193, 0.6)" },
         daily: { color: "rgb(40, 167, 69)", bg: "rgba(40, 167, 69, 0.1)" },
       };
 
-      window.changeRange = function (limit, btn) {
+      // --- СМЕНА РЕЖИМА ГРАФИКА (Кнопки) ---
+      window.setChartMode = function (mode) {
+        if (currentMode === mode) return;
+        currentMode = mode;
+
+        document
+          .querySelectorAll(".info-card")
+          .forEach((el) => el.classList.remove("active-card"));
+        document.getElementById(`card-${mode}`).classList.add("active-card");
+
+        const standardBtns = document.getElementById("range-selector-standard");
+        const historyBtns = document.getElementById("range-selector-history");
+
+        if (mode === "energy") {
+          // Режим счетчика -> кнопки истории
+          standardBtns.style.display = "none";
+          historyBtns.style.display = "flex";
+
+          // Сразу активируем "День"
+          changeRange("day", 10000, historyBtns.querySelector(".range-btn"));
+
+          initPowerMonitor("bar");
+        } else {
+          // Остальные режимы -> стандартные кнопки
+          historyBtns.style.display = "none";
+          standardBtns.style.display = "flex";
+
+          // Сразу активируем "1 год"
+          changeRange(
+            "standard",
+            250,
+            standardBtns.querySelector(".range-btn")
+          );
+
+          initPowerMonitor("line");
+        }
+      };
+
+      // --- СМЕНА ДИАПАЗОНА (Логика лимитов) ---
+      window.changeRange = function (type, limit, btn) {
         document
           .querySelectorAll(".range-btn")
           .forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
+        if (btn) btn.classList.add("active");
+
         currentLimit = limit;
+        currentRangeType = type;
 
         if (unsubscribeMeter) {
           unsubscribeMeter();
@@ -247,14 +308,133 @@
         if (powerChart) powerChart.resetZoom();
       };
 
-      window.setChartMode = function (mode) {
-        currentMode = mode;
-        document
-          .querySelectorAll(".info-card")
-          .forEach((el) => el.classList.remove("active-card"));
-        document.getElementById(`card-${mode}`).classList.add("active-card");
-        updateChartData();
-      };
+      // === ПОЛУЧЕНИЕ НОМЕРА НЕДЕЛИ ===
+      function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        var weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+        return weekNo;
+      }
+
+      // === НАЗВАНИЯ МЕСЯЦЕВ ===
+      function getMonthNameUA(monthIndex) {
+        const months = [
+          "Січень",
+          "Лютий",
+          "Березень",
+          "Квітень",
+          "Травень",
+          "Червень",
+          "Липень",
+          "Серпень",
+          "Вересень",
+          "Жовтень",
+          "Листопад",
+          "Грудень",
+        ];
+        return months[monthIndex];
+      }
+
+      // === ГЛАВНАЯ ЛОГИКА ОБРАБОТКИ СТОЛБИКОВ ===
+      function processBarData() {
+        if (cachedData.energy.length < 2) return { labels: [], data: [] };
+
+        const grouped = {};
+
+        // 1. Проходим по всем данным
+        cachedData.fullDates.forEach((dateStr, index) => {
+          const dateObj = new Date(dateStr);
+          if (isNaN(dateObj)) return;
+
+          let key = "";
+          let label = "";
+          let sortKey = 0;
+
+          // --- ЛОГИКА ДЛЯ ДНЯ (7 дней) ---
+          if (currentRangeType === "day") {
+            // Ключ: YYYY-MM-DD (уникальный день)
+            key = dateObj.toISOString().split("T")[0];
+            // Подпись: 17.12
+            label = `${String(dateObj.getDate()).padStart(2, "0")}.${String(
+              dateObj.getMonth() + 1
+            ).padStart(2, "0")}`;
+            sortKey = dateObj.getTime();
+          }
+          // --- ЛОГИКА ДЛЯ НЕДЕЛИ (4 недели) ---
+          else if (currentRangeType === "week") {
+            const weekNum = getWeekNumber(dateObj);
+            const year = dateObj.getFullYear();
+            // Ключ: 2025-W51
+            key = `${year}-W${weekNum}`;
+            // Подпись: Тиждень 51
+            label = `Тиждень ${weekNum}`;
+            // Сортировка по номеру года + недели
+            sortKey = year * 100 + weekNum;
+          }
+          // --- ЛОГИКА ДЛЯ МЕСЯЦА (12 месяцев) ---
+          else if (currentRangeType === "month") {
+            const month = dateObj.getMonth();
+            const year = dateObj.getFullYear();
+            // Ключ: 2025-11 (Год-Месяц)
+            key = `${year}-${month}`;
+            // Подпись: Грудень
+            label = getMonthNameUA(month);
+            sortKey = year * 100 + month;
+          } else {
+            return { labels: [], data: [] };
+          }
+
+          // Инициализируем группу, если её нет
+          if (!grouped[key]) {
+            grouped[key] = {
+              min: Infinity,
+              max: -Infinity,
+              label: label,
+              sort: sortKey,
+            };
+          }
+
+          // Ищем мин и макс счетчика в этот период
+          const val = cachedData.energy[index];
+          if (val < grouped[key].min) grouped[key].min = val;
+          if (val > grouped[key].max) grouped[key].max = val;
+        });
+
+        // 2. Превращаем в массив и сортируем по времени
+        let sortedKeys = Object.keys(grouped).sort(
+          (a, b) => grouped[a].sort - grouped[b].sort
+        );
+
+        // 3. Обрезаем массив (берем только последние N элементов)
+        if (currentRangeType === "day") {
+          sortedKeys = sortedKeys.slice(-7); // Последние 7 дней
+        }
+        if (currentRangeType === "week") {
+          sortedKeys = sortedKeys.slice(-4); // Последние 4 недели
+        }
+        if (currentRangeType === "month") {
+          sortedKeys = sortedKeys.slice(-12); // Последние 12 месяцев
+        }
+
+        const resultLabels = [];
+        const resultData = [];
+
+        sortedKeys.forEach((key) => {
+          const item = grouped[key];
+          let consumption = item.max - item.min;
+
+          // Фильтры от "мусора"
+          if (consumption < 0) consumption = 0;
+          // Если дельта слишком огромная (сбой счетчика), игнорируем
+          if (consumption > 2000) consumption = 0;
+
+          resultLabels.push(item.label);
+          resultData.push(consumption.toFixed(2));
+        });
+
+        return { labels: resultLabels, data: resultData };
+      }
 
       function updateChartData() {
         if (!powerChart) return;
@@ -263,38 +443,53 @@
         let labelText = "";
         const todayStr = new Date().toLocaleDateString("uk-UA");
 
-        switch (currentMode) {
-          case "power":
-            labelText = "Потужність (W)";
-            break;
-          case "voltage":
-            labelText = "Напруга (V)";
-            break;
-          case "energy":
-            labelText = "Всього накопичено (Total kWh)";
-            break;
-          case "daily":
-            labelText = `Споживання за ${todayStr} (kWh)`;
-            break;
+        if (currentMode === "energy") {
+          // === СТРОИМ СТОЛБИКИ ===
+          const barData = processBarData();
+
+          if (currentRangeType === "day")
+            labelText = "Споживання за останні 7 днів (kWh)";
+          else if (currentRangeType === "week")
+            labelText = "Споживання за останні 4 тижні (kWh)";
+          else if (currentRangeType === "month")
+            labelText = "Споживання за останні 12 місяців (kWh)";
+          else labelText = "Споживання (kWh)";
+
+          powerChart.data.labels = barData.labels;
+          powerChart.data.datasets[0].data = barData.data;
+          powerChart.options.scales.y.beginAtZero = true;
+        } else {
+          // === СТРОИМ ЛИНИИ (обычные) ===
+          switch (currentMode) {
+            case "power":
+              labelText = "Потужність (W)";
+              break;
+            case "voltage":
+              labelText = "Напруга (V)";
+              break;
+            case "daily":
+              labelText = `Споживання за ${todayStr} (kWh)`;
+              break;
+          }
+
+          if (currentMode === "daily") {
+            powerChart.data.datasets[0].data = cachedData.dailyEnergyProfile;
+          } else {
+            powerChart.data.datasets[0].data = cachedData[currentMode];
+          }
+
+          powerChart.data.labels = cachedData.labels;
+
+          if (currentMode === "voltage") {
+            powerChart.options.scales.y.beginAtZero = false;
+          } else {
+            powerChart.options.scales.y.beginAtZero = true;
+          }
         }
 
         powerChart.data.datasets[0].label = labelText;
         powerChart.data.datasets[0].borderColor = colors.color;
         powerChart.data.datasets[0].backgroundColor = colors.bg;
-
-        if (currentMode === "daily") {
-          powerChart.data.datasets[0].data = cachedData.dailyEnergyProfile;
-        } else {
-          powerChart.data.datasets[0].data = cachedData[currentMode];
-        }
-
-        if (currentMode === "voltage" || currentMode === "energy") {
-          powerChart.options.scales.y.beginAtZero = false;
-        } else {
-          powerChart.options.scales.y.beginAtZero = true;
-        }
-
-        powerChart.data.labels = cachedData.labels;
         powerChart.update();
       }
 
@@ -314,25 +509,47 @@
           .limit(1)
           .get()
           .then((snapshot) => {
-            if (!snapshot.empty) {
+            if (!snapshot.empty)
               todayStartEnergy = snapshot.docs[0].data().energy;
-            } else {
-              todayStartEnergy = null;
-            }
+            else todayStartEnergy = null;
           })
           .catch((error) => console.error("Index Error:", error));
       }
 
       function startMeterListener() {
-        console.log("Subscribing with limit:", currentLimit);
+        console.log("Запит до бази з лімітом:", currentLimit);
+
+        if (unsubscribeMeter) unsubscribeMeter();
+
         unsubscribeMeter = db
           .collection("meter_readings")
           .orderBy("created_at", "desc")
           .limit(currentLimit)
           .onSnapshot(
             (snapshot) => {
+              // === ДИАГНОСТИКА ===
+              console.log(`--- ОТРИМАНО ДАНИХ ---`);
+              console.log(`Кількість записів: ${snapshot.size}`);
+              if (!snapshot.empty) {
+                const newest = snapshot.docs[0].data().created_at;
+                const oldest =
+                  snapshot.docs[snapshot.size - 1].data().created_at;
+                console.log(`Найновіший запис: ${newest}`);
+                console.log(`Найстаріший запис: ${oldest}`);
+
+                // Расчет плотности
+                const d1 = new Date(newest);
+                const d2 = new Date(oldest);
+                const diffHours = Math.abs(d1 - d2) / 36e5;
+                console.log(`Охоплено годин: ${diffHours.toFixed(1)}`);
+              } else {
+                console.log("Даних немає взагалі!");
+              }
+              // ===================
+
               const temps = {
                 labels: [],
+                fullDates: [],
                 power: [],
                 voltage: [],
                 energy: [],
@@ -343,6 +560,9 @@
               snapshot.forEach((doc) => {
                 const data = doc.data();
                 if (!latestDoc) latestDoc = data;
+
+                temps.fullDates.push(data.created_at);
+
                 const fullTime = data.created_at
                   ? data.created_at.split(" ")[1]
                   : "";
@@ -364,6 +584,7 @@
 
               window.lastDataTime = new Date();
               cachedData.labels = temps.labels.reverse();
+              cachedData.fullDates = temps.fullDates.reverse();
               cachedData.power = temps.power.reverse();
               cachedData.voltage = temps.voltage.reverse();
               cachedData.energy = temps.energy.reverse();
@@ -389,31 +610,32 @@
               }
               updateChartData();
             },
-            (error) => {
-              console.error("Error readings:", error);
-            }
+            (error) => console.error("Error readings:", error)
           );
       }
 
-      function initPowerMonitor() {
+      function initPowerMonitor(chartType = "line") {
         const ctx = document.getElementById("powerChart").getContext("2d");
+        if (powerChart) powerChart.destroy();
+
         const isDark = document.body.classList.contains("dark");
         const gridColor = isDark ? "#444" : "#eee";
         const textColor = isDark ? "#ccc" : "#666";
 
         powerChart = new Chart(ctx, {
-          type: "line",
+          type: chartType,
           data: {
             labels: [],
             datasets: [
               {
                 label: "Завантаження...",
                 data: [],
-                borderWidth: 2,
+                borderWidth: chartType === "bar" ? 0 : 2,
                 fill: true,
                 tension: 0.4,
                 pointRadius: 0,
-                pointHoverRadius: 4,
+                barPercentage: 0.6,
+                categoryPercentage: 0.8,
               },
             ],
           },
@@ -440,30 +662,27 @@
                 grid: { color: gridColor },
               },
             },
-            animation: { duration: 0 },
+            animation: { duration: 300 },
           },
         });
+      }
 
-        setInterval(() => {
-          const statusEl = document.getElementById("admin-status");
-          if (window.lastDataTime) {
-            const diffSeconds = (new Date() - window.lastDataTime) / 1000;
-            if (diffSeconds > 35) {
-              statusEl.innerHTML =
-                '<span style="color:red; font-weight:bold;">⚠️ OFFLINE</span>';
-              document.querySelector(".dashboard-wrapper").style.opacity =
-                "0.5";
-            } else {
-              statusEl.innerHTML =
-                '<span style="color:#28a745;">● ONLINE</span>';
-              document.querySelector(".dashboard-wrapper").style.opacity = "1";
-            }
+      setInterval(() => {
+        const statusEl = document.getElementById("admin-status");
+        if (window.lastDataTime) {
+          const diffSeconds = (new Date() - window.lastDataTime) / 1000;
+          if (diffSeconds > 75) {
+            statusEl.innerHTML =
+              '<span style="color:red; font-weight:bold;">⚠️ OFFLINE</span>';
+            document.querySelector(".dashboard-wrapper").style.opacity = "0.5";
+          } else {
+            statusEl.innerHTML = '<span style="color:#28a745;">● ONLINE</span>';
+            document.querySelector(".dashboard-wrapper").style.opacity = "1";
           }
-        }, 5000);
+        }
+      }, 5000);
 
-        fetchTodayStartEnergy();
-        startMeterListener();
-
+      function initLogs() {
         db.collection("system_logs")
           .orderBy("created_at", "desc")
           .limit(10)
@@ -477,7 +696,6 @@
             }
             snapshot.forEach((doc) => {
               const data = doc.data();
-              let dateStr = data.created_at || "---";
               let reasonColor = "inherit";
               let reasonWeight = "normal";
               const r = data.reason || "";
@@ -494,7 +712,9 @@
                 reasonWeight = "bold";
               }
               const row = `<tr>
-                    <td style="font-family: monospace; opacity: 0.8;">${dateStr}</td>
+                    <td style="font-family: monospace; opacity: 0.8;">${
+                      data.created_at || "---"
+                    }</td>
                     <td style="font-weight: 500;">${data.message || "---"}</td>
                     <td style="color: ${reasonColor}; font-weight: ${reasonWeight};">${r}</td>
                 </tr>`;
@@ -503,10 +723,8 @@
           });
       }
 
-      // НОВАЯ ФУНКЦИЯ: Заглушка для клика по имени пользователя
       function showUserProfile() {
-        //alert("Переход в профиль пользователя (заглушка)");
-        console.log("Clicked on user profile link.");
+        console.log("Profile clicked");
       }
 
       window.addEventListener("DOMContentLoaded", async () => {
@@ -515,6 +733,7 @@
         await loadComponent("sidebar-placeholder", "sidebar.html");
         if (typeof BUILD_VERSION !== "undefined")
           document.getElementById("buildVersion").textContent = BUILD_VERSION;
+
         auth.onAuthStateChanged((user) => {
           if (user && db) {
             checkAdminStatus(user);
@@ -532,18 +751,13 @@
             isAdmin = true;
             document.getElementById("monitoring-section").style.display =
               "block";
-
-            // === ДОБАВЛЕНО: Отображаем email/имя в шапке ===
             const username = doc.data().username || user.email;
             document.getElementById("user-email-display").textContent =
               username;
-            // ==============================================
-
-            // Показываем пункты меню
             const adminMenuItem = document.getElementById("admin-menu-item");
             if (adminMenuItem) adminMenuItem.style.display = "block";
-
             initPowerMonitor();
+            initLogs();
           } else {
             window.location.replace("index.html");
           }
