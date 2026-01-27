@@ -5,7 +5,12 @@
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 
-// ================= НАСТРОЙКИ =================
+// ================= РЕЖИМЫ РАБОТЫ (ПАНЕЛЬ УПРАВЛЕНИЯ) =================
+// Меняйте true на false, чтобы отключать каналы связи
+const bool ENABLE_WIFI = true; // true = Использовать Wi-Fi (Основной)
+const bool ENABLE_GSM = true;  // true = Использовать GSM (Резервный)
+
+// ================= НАСТРОЙКИ СЕТИ =================
 const char *wifi_ssid = "Xiaomi_9D58"; // <--- ВАШ WI-FI
 const char *wifi_pass = "Am5084ak";    // <--- ВАШ ПАРОЛЬ
 
@@ -44,20 +49,34 @@ void setup()
     pinMode(MAINS_PIN, INPUT);
     pinMode(BAT_PIN, INPUT);
 
-    // GSM Старт
-    SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
-    delay(3000);
-    SerialMon.println("System Start. Init Modem...");
-    modem.restart();
+    // 1. Инициализация GSM (Только если разрешено)
+    if (ENABLE_GSM)
+    {
+        SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+        delay(3000);
+        SerialMon.println("System Start. Init Modem...");
+        modem.restart();
+        httpGsm.setHttpResponseTimeout(90000);
+    }
+    else
+    {
+        SerialMon.println("GSM is DISABLED in settings.");
+    }
 
-    // Wi-Fi Старт
-    SerialMon.println("Init Wi-Fi...");
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(wifi_ssid, wifi_pass);
+    // 2. Инициализация Wi-Fi (Только если разрешено)
+    if (ENABLE_WIFI)
+    {
+        SerialMon.println("Init Wi-Fi...");
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(wifi_ssid, wifi_pass);
+        httpWifi.setHttpResponseTimeout(15000);
+    }
+    else
+    {
+        SerialMon.println("Wi-Fi is DISABLED in settings.");
+    }
 
-    httpWifi.setHttpResponseTimeout(15000);
-    httpGsm.setHttpResponseTimeout(90000);
-
+    // Проверка статуса при старте
     if (digitalRead(MAINS_PIN) == HIGH)
     {
         isPowerOn = true;
@@ -82,7 +101,6 @@ void loop()
         {
             isPowerOn = currentReading;
 
-            // Теперь эта функция снова пишет логи в монитор!
             int bat = getBatteryPercentage(isPowerOn);
 
             if (isPowerOn)
@@ -109,7 +127,7 @@ void loop()
     delay(100);
 }
 
-// === УМНАЯ ОТПРАВКА ===
+// === УМНАЯ ОТПРАВКА С УЧЕТОМ НАСТРОЕК ===
 void sendSmart(int val, String deviceStatus, int batLevel)
 {
 
@@ -120,50 +138,56 @@ void sendSmart(int val, String deviceStatus, int batLevel)
 
     bool sent = false;
 
-    // 1. WI-FI
-    if (WiFi.status() != WL_CONNECTED)
+    // --- ШАГ 1: Wi-Fi ---
+    // Пробуем только если: 1. В настройках включено.
+    if (ENABLE_WIFI)
     {
-        SerialMon.print("Wi-Fi lost. Reconnecting");
-        WiFi.reconnect();
-        for (int i = 0; i < 30; i++)
+
+        // Если отвалился - пробуем переподключить
+        if (WiFi.status() != WL_CONNECTED)
         {
-            if (WiFi.status() == WL_CONNECTED)
-                break;
-            SerialMon.print(".");
-            delay(100);
+            SerialMon.print("Wi-Fi lost. Reconnecting");
+            WiFi.reconnect();
+            for (int i = 0; i < 30; i++)
+            {
+                if (WiFi.status() == WL_CONNECTED)
+                    break;
+                SerialMon.print(".");
+                delay(100);
+            }
+            SerialMon.println();
         }
-        SerialMon.println();
-    }
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        SerialMon.print("[Wi-Fi] Sending... ");
-        int err = httpWifi.get(path);
-        int statusCode = httpWifi.responseStatusCode();
-
-        // Проверка успеха (Ошибок нет И статус 200 ОК)
-        if (err == 0 && statusCode == 200)
+        if (WiFi.status() == WL_CONNECTED)
         {
-            SerialMon.println("Success!");
-            httpWifi.responseBody();
-            sent = true;
+            SerialMon.print("[Wi-Fi] Sending... ");
+            int err = httpWifi.get(path);
+            int statusCode = httpWifi.responseStatusCode();
+
+            // Проверка успеха (Ошибок нет И статус 200 ОК)
+            if (err == 0 && statusCode == 200)
+            {
+                SerialMon.println("Success!");
+                httpWifi.responseBody();
+                sent = true;
+            }
+            else
+            {
+                SerialMon.print("Error! Code: ");
+                SerialMon.print(err); // -1...-4 это ошибки сети
+                SerialMon.print(" | HTTP Status: ");
+                SerialMon.println(statusCode); // Код ответа сервера
+            }
         }
         else
         {
-            // ВОТ ТУТ МЫ ТЕПЕРЬ УВИДИМ ПРИЧИНУ
-            SerialMon.print("Error! Code: ");
-            SerialMon.print(err); // -1...-4 это ошибки сети
-            SerialMon.print(" | HTTP Status: ");
-            SerialMon.println(statusCode); // Код ответа сервера
+            SerialMon.println("[Wi-Fi] No connection.");
         }
     }
-    else
-    {
-        SerialMon.println("[Wi-Fi] No connection.");
-    }
 
-    // 2. GSM (РЕЗЕРВ)
-    if (!sent)
+    // --- ШАГ 2: GSM ---
+    // Пробуем если: 1. Wi-Fi не справился (или выключен). 2. GSM включен в настройках.
+    if (!sent && ENABLE_GSM)
     {
         SerialMon.println("[GSM] Switching to Backup Channel...");
 
@@ -190,9 +214,13 @@ void sendSmart(int val, String deviceStatus, int batLevel)
             SerialMon.println("Error via GSM: " + String(err));
         }
     }
+    else if (!sent && !ENABLE_GSM)
+    {
+        SerialMon.println("Message NOT sent: Wi-Fi failed and GSM is disabled.");
+    }
 }
 
-// === ФУНКЦИЯ ЧТЕНИЯ БАТАРЕИ (С ЛОГАМИ) ===
+// === БАТАРЕЯ (Коэфф 2.40) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -203,7 +231,6 @@ int getBatteryPercentage(bool charging)
     }
     float average = sum / 20.0;
 
-    // Ваш калибровочный коэффициент 2.46
     float voltage = (average / 4095.0) * 3.3 * 2.40;
 
     int percentage = 0;
@@ -221,7 +248,6 @@ int getBatteryPercentage(bool charging)
     if (percentage < 0)
         percentage = 0;
 
-    // ВЕРНУЛ ЛОГИ СЮДА:
     SerialMon.print("Bat Voltage: ");
     SerialMon.print(voltage);
     SerialMon.print("V | Mode: ");
