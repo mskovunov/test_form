@@ -7,7 +7,7 @@
 
 // ================= РЕЖИМЫ РАБОТЫ (ПАНЕЛЬ УПРАВЛЕНИЯ) =================
 // Меняйте true на false, чтобы отключать каналы связи
-const bool ENABLE_WIFI = true; // true = Использовать Wi-Fi (Основной)
+const bool ENABLE_WIFI = true; // false = Использовать Wi-Fi (Основной) false
 const bool ENABLE_GSM = true;  // true = Использовать GSM (Резервный)
 
 // ================= НАСТРОЙКИ СЕТИ =================
@@ -44,7 +44,8 @@ unsigned long lastKeepAlive = 0;
 void setup()
 {
     SerialMon.begin(115200);
-    delay(1000);
+    // ПРАВКА 1: Даем питанию стабилизироваться при включении
+    delay(2000);
 
     pinMode(MAINS_PIN, INPUT);
     pinMode(BAT_PIN, INPUT);
@@ -63,14 +64,16 @@ void setup()
         SerialMon.println("GSM is DISABLED in settings.");
     }
 
+    // ПРАВКА 2: Пауза между GSM и Wi-Fi, чтобы не было скачка тока
+    delay(2000);
+
     // 2. Инициализация Wi-Fi (Только если разрешено)
     if (ENABLE_WIFI)
     {
         SerialMon.println("Init Wi-Fi...");
         WiFi.mode(WIFI_STA);
         WiFi.begin(wifi_ssid, wifi_pass);
-        // Увеличиваем тайм-аут до 20 секунд (PushingBox бывает медленным)
-        httpWifi.setHttpResponseTimeout(20000);
+        httpWifi.setHttpResponseTimeout(20000); // Тайм-аут 20 сек
     }
     else
     {
@@ -88,6 +91,11 @@ void setup()
         isPowerOn = false;
         SerialMon.println("STARTUP: Power OFF");
     }
+
+    // ПРАВКА 3: Отправляем приветственное сообщение, чтобы убедиться, что система не зависла
+    SerialMon.println("Sending Boot Notification...");
+    int bat = getBatteryPercentage(isPowerOn);
+    sendSmart(1, "SystemStart", bat);
 }
 
 void loop()
@@ -117,7 +125,7 @@ void loop()
         }
     }
 
-    if (millis() - lastKeepAlive > 60000)
+    if (millis() - lastKeepAlive > 60000) // Таймаут отправки данных (60000 - 1мин)
     {
         int bat = getBatteryPercentage(isPowerOn);
         SerialMon.println("Routine Check...");
@@ -128,7 +136,7 @@ void loop()
     delay(100);
 }
 
-// === УМНАЯ ОТПРАВКА (С ПОВТОРНЫМИ ПОПЫТКАМИ) ===
+// === УМНАЯ ОТПРАВКА С УЧЕТОМ НАСТРОЕК ===
 void sendSmart(int val, String deviceStatus, int batLevel)
 {
 
@@ -139,33 +147,33 @@ void sendSmart(int val, String deviceStatus, int batLevel)
 
     bool sent = false;
 
-    // --- ШАГ 1: Wi-Fi с циклом попыток ---
+    // --- ШАГ 1: Wi-Fi ---
+    // Пробуем только если: 1. В настройках включено.
     if (ENABLE_WIFI)
     {
-
-        // Пробуем отправить 3 раза, если возникают ошибки
+        // ПРАВКА 4: Цикл из 3 попыток для надежности
         for (int attempt = 1; attempt <= 3; attempt++)
         {
-
-            // 1. Проверка соединения
+            // Если отвалился - пробуем переподключить
             if (WiFi.status() != WL_CONNECTED)
             {
-                SerialMon.print("Wi-Fi reconnecting...");
+                SerialMon.print("Wi-Fi lost. Reconnecting");
                 WiFi.reconnect();
-                for (int k = 0; k < 20; k++)
-                { // Ждем до 2 сек
+                for (int i = 0; i < 30; i++)
+                {
                     if (WiFi.status() == WL_CONNECTED)
                         break;
+                    SerialMon.print(".");
                     delay(100);
                 }
-                SerialMon.println(WiFi.status() == WL_CONNECTED ? "OK" : "Fail");
+                SerialMon.println();
             }
 
             if (WiFi.status() == WL_CONNECTED)
             {
                 SerialMon.print("[Wi-Fi] Attempt " + String(attempt) + "... ");
 
-                // ВАЖНО: Закрываем старое соединение перед новым запросом
+                // ПРАВКА 5: Очистка старого сокета
                 httpWifi.stop();
 
                 int err = httpWifi.get(path);
@@ -177,72 +185,63 @@ void sendSmart(int val, String deviceStatus, int batLevel)
                     SerialMon.println("Success!");
                     httpWifi.responseBody();
                     sent = true;
-                    break; // Выход из цикла попыток, всё получилось!
+                    break; // Успех, выходим из цикла
                 }
                 else
                 {
-                    SerialMon.print("Error: ");
-                    SerialMon.print(err);
-                    SerialMon.print(" | Status: ");
-                    SerialMon.println(statusCode);
-                    // Ждем 2 секунды перед следующей попыткой
-                    delay(2000);
+                    SerialMon.print("Error! Code: ");
+                    SerialMon.print(err); // -1...-4 это ошибки сети
+                    SerialMon.print(" | HTTP Status: ");
+                    SerialMon.println(statusCode); // Код ответа сервера
+                    delay(2000);                   // Ждем 2 сек перед повтором
                 }
             }
             else
             {
-                SerialMon.print("Error! Code: ");
-                SerialMon.print(err); // -1...-4 это ошибки сети
-                SerialMon.print(" | HTTP Status: ");
-                SerialMon.println(statusCode); // Код ответа сервера
+                SerialMon.println("[Wi-Fi] No connection.");
+                delay(1000);
             }
+        } // Конец цикла попыток Wi-Fi
+    }
+
+    // --- ШАГ 2: GSM ---
+    // Пробуем если: 1. Wi-Fi не справился (или выключен). 2. GSM включен в настройках.
+    if (!sent && ENABLE_GSM)
+    {
+        SerialMon.println("[GSM] Switching to Backup Channel...");
+
+        if (!modem.isGprsConnected())
+        {
+            SerialMon.print("[GSM] Connecting GPRS... ");
+            if (!modem.gprsConnect(apn, user, pass))
+            {
+                SerialMon.println("FAIL");
+                return;
+            }
+            SerialMon.println("OK");
+        }
+
+        SerialMon.print("[GSM] Sending... ");
+        httpGsm.stop(); // Очистка сокета
+
+        int err = httpGsm.get(path);
+        if (err == 0)
+        {
+            SerialMon.println("Success!");
+            httpGsm.responseBody();
         }
         else
         {
-            SerialMon.println("[Wi-Fi] No connection.");
-            delay(1000);
+            SerialMon.println("Error via GSM: " + String(err));
         }
-    } // конец цикла попыток
-}
-
-// --- ШАГ 2: GSM (Только если Wi-Fi не справился за 3 попытки) ---
-if (!sent && ENABLE_GSM)
-{
-    SerialMon.println("[GSM] Switching to Backup Channel...");
-
-    if (!modem.isGprsConnected())
-    {
-        SerialMon.print("[GSM] Connecting GPRS... ");
-        if (!modem.gprsConnect(apn, user, pass))
-        {
-            SerialMon.println("FAIL");
-            return;
-        }
-        SerialMon.println("OK");
     }
-
-    SerialMon.print("[GSM] Sending... ");
-    // Тут тоже полезно закрыть старый сокет
-    httpGsm.stop();
-
-    int err = httpGsm.get(path);
-    if (err == 0)
+    else if (!sent && !ENABLE_GSM)
     {
-        SerialMon.println("Success!");
-        httpGsm.responseBody();
-    }
-    else
-    {
-        SerialMon.println("Error via GSM: " + String(err));
+        SerialMon.println("Message NOT sent: Wi-Fi failed and GSM is disabled.");
     }
 }
-else if (!sent && !ENABLE_GSM)
-{
-    SerialMon.println("FAILED. Wi-Fi attempts exhausted, GSM disabled.");
-}
-}
 
-// === БАТАРЕЯ (Новый Коэфф 2.05) ===
+// === БАТАРЕЯ (Коэфф 2.05) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -253,8 +252,7 @@ int getBatteryPercentage(bool charging)
     }
     float average = sum / 20.0;
 
-    // ИСПРАВЛЕНИЕ: Снизили с 2.35 до 2.05
-    // Чтобы убрать завышенные показания (4.9В -> 4.2В)
+    // ПРАВКА 6: Коэффициент 2.05 (исправляет 4.9В -> 4.2В)
     float voltage = (average / 4095.0) * 3.3 * 2.05;
 
     int percentage = 0;
@@ -264,7 +262,7 @@ int getBatteryPercentage(bool charging)
     }
     else
     {
-        percentage = map(voltage * 100, 320, 370, 0, 100);
+        percentage = map(voltage * 100, 320, 380, 0, 100);
     }
 
     if (percentage > 100)
