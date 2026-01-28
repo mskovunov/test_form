@@ -164,7 +164,6 @@ void sendSmart(int val, String deviceStatus, int batLevel)
             int err = httpWifi.get(path);
             int statusCode = httpWifi.responseStatusCode();
 
-            // Проверка успеха (Ошибок нет И статус 200 ОК)
             if (err == 0 && statusCode == 200)
             {
                 SerialMon.println("Success!");
