@@ -2,23 +2,26 @@
 #define TINY_GSM_RX_BUFFER 1024
 
 #include <WiFi.h>
+#include <HTTPClient.h> // Библиотека для прямого HTTPS (Wi-Fi)
 #include <TinyGsmClient.h>
-#include <ArduinoHttpClient.h>
+#include <ArduinoHttpClient.h> // Библиотека для PushingBox (GSM)
 
-// ================= РЕЖИМЫ РАБОТЫ (ПАНЕЛЬ УПРАВЛЕНИЯ) =================
-// Меняйте true на false, чтобы отключать каналы связи
-const bool ENABLE_WIFI = true; // true = Использовать Wi-Fi (Основной) false
-const bool ENABLE_GSM = true;  // true = Использовать GSM (Резервный)
+// ================= НАСТРОЙКИ =================
+const bool ENABLE_WIFI = true;
+const bool ENABLE_GSM = true;
 
-// ================= НАСТРОЙКИ СЕТИ =================
-const char *wifi_ssid = "Xiaomi_9D58"; // <--- ВАШ WI-FI
-const char *wifi_pass = "Am5084ak";    // <--- ВАШ ПАРОЛЬ
+const char *wifi_ssid = "Xiaomi_9D58";
+const char *wifi_pass = "Am5084ak";
 
+// --- НАСТРОЙКИ ДЛЯ БЕЗЛИМИТНОГО WI-FI (Google) ---
+// Вставьте сюда ID вашего скрипта (Длинная строка из URL между /s/ и /exec)
+String GAS_SCRIPT_ID = "ВСТАВЬТЕ_СЮДА_ВАШ_GOOGLE_SCRIPT_ID";
+
+// --- НАСТРОЙКИ ДЛЯ РЕЗЕРВНОГО GSM (PushingBox) ---
 const char apn[] = "internet";
 const char user[] = "";
 const char pass[] = "";
-
-const char *DEVID = "vA48E437DF1936FA";
+const char *DEVID = "vA48E437DF1936FA"; // Ваш ID из PushingBox
 
 // ================= ПИНЫ =================
 #define MODEM_RST 23
@@ -34,8 +37,6 @@ const char *DEVID = "vA48E437DF1936FA";
 WiFiClient clientWifi;
 TinyGsm modem(SerialAT);
 TinyGsmClient clientGsm(modem);
-
-HttpClient httpWifi(clientWifi, "api.pushingbox.com", 80);
 HttpClient httpGsm(clientGsm, "api.pushingbox.com", 80);
 
 bool isPowerOn = true;
@@ -59,27 +60,17 @@ void setup()
         modem.restart();
         httpGsm.setHttpResponseTimeout(90000);
     }
-    else
-    {
-        SerialMon.println("GSM is DISABLED in settings.");
-    }
 
     // ПРАВКА 2: Пауза между GSM и Wi-Fi, чтобы не было скачка тока
     delay(2000);
-
     // 2. Инициализация Wi-Fi (Только если разрешено)
     if (ENABLE_WIFI)
     {
         SerialMon.println("Init Wi-Fi...");
         WiFi.mode(WIFI_STA);
         WiFi.begin(wifi_ssid, wifi_pass);
-        httpWifi.setHttpResponseTimeout(20000); // Тайм-аут 20 сек
+        // Тут тайм-аут не ставим, используем встроенный в HTTPClient
     }
-    else
-    {
-        SerialMon.println("Wi-Fi is DISABLED in settings.");
-    }
-
     // Проверка статуса при старте
     if (digitalRead(MAINS_PIN) == HIGH)
     {
@@ -92,8 +83,7 @@ void setup()
         SerialMon.println("STARTUP: Power OFF");
     }
 
-    // ПРАВКА 3: Отправляем приветственное сообщение, чтобы убедиться, что система не зависла
-    SerialMon.println("Sending Boot Notification...");
+    // ПРАВКА 3: Отправляем приветственное сообщение, чтобы убедиться, что система не зависла    SerialMon.println("Setup Done. Sending Boot Info...");
     int bat = getBatteryPercentage(isPowerOn);
     sendSmart(1, "SystemStart", bat);
 }
@@ -109,9 +99,7 @@ void loop()
         if (digitalRead(MAINS_PIN) == sensorVal)
         {
             isPowerOn = currentReading;
-
             int bat = getBatteryPercentage(isPowerOn);
-
             if (isPowerOn)
             {
                 SerialMon.println("EVENT: Power Restored");
@@ -125,109 +113,104 @@ void loop()
         }
     }
 
-    if (millis() - lastKeepAlive > 600000) // Таймаут отправки данных (60000 - 1мин)
+    // ТЕПЕРЬ МОЖНО ЧАЩЕ! Например, раз в 5 минут (300000 мс)
+    // Wi-Fi "бесплатный", а GSM будет тратить лимит PushingBox только при аварии
+    if (millis() - lastKeepAlive > 300000)
     {
         int bat = getBatteryPercentage(isPowerOn);
         SerialMon.println("Routine Check...");
         sendSmart(isPowerOn ? 1 : 0, "RoutineCheck", bat);
         lastKeepAlive = millis();
     }
-
     delay(100);
 }
 
-// === УМНАЯ ОТПРАВКА С УЧЕТОМ НАСТРОЕК ===
 void sendSmart(int val, String deviceStatus, int batLevel)
 {
-
-    String path = "/pushingbox?devid=" + String(DEVID) +
-                  "&val=" + String(val) +
-                  "&device=" + deviceStatus +
-                  "&bat=" + String(batLevel);
-
     bool sent = false;
 
-    // --- ШАГ 1: Wi-Fi ---
-    // Пробуем только если: 1. В настройках включено.
+    // --- 1. КАНАЛ WI-FI (ПРЯМОЙ В GOOGLE - БЕЗЛИМИТ) ---
     if (ENABLE_WIFI)
     {
-        // ПРАВКА 4: Цикл из 3 попыток для надежности
-        for (int attempt = 1; attempt <= 3; attempt++)
+        // Реконнект если нужно
+        if (WiFi.status() != WL_CONNECTED)
         {
-            // Если отвалился - пробуем переподключить
-            if (WiFi.status() != WL_CONNECTED)
+            SerialMon.print("Wi-Fi reconnecting...");
+            WiFi.reconnect();
+            for (int i = 0; i < 30; i++)
             {
-                SerialMon.print("Wi-Fi lost. Reconnecting");
-                WiFi.reconnect();
-                for (int i = 0; i < 30; i++)
-                {
-                    if (WiFi.status() == WL_CONNECTED)
-                        break;
-                    SerialMon.print(".");
-                    delay(100);
-                }
-                SerialMon.println();
+                if (WiFi.status() == WL_CONNECTED)
+                    break;
+                SerialMon.print(".");
+                delay(100);
             }
+            SerialMon.println();
+        }
 
-            if (WiFi.status() == WL_CONNECTED)
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            HTTPClient http;
+
+            // Формируем прямой URL для Google Script
+            String url = "https://script.google.com/macros/s/" + GAS_SCRIPT_ID + "/exec";
+            url += "?val=" + String(val);
+            url += "&device=" + deviceStatus;
+            url += "&bat=" + String(batLevel);
+
+            // ВАЖНО: Разрешаем переадресацию (Google всегда делает Redirect 302)
+            http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+            // Отключаем проверку сертификата (чтобы не менять его каждые 3 месяца)
+            http.begin(url);
+
+            SerialMon.print("[Wi-Fi Direct] Sending... ");
+            int httpCode = http.GET();
+
+            if (httpCode == 200)
             {
-                SerialMon.print("[Wi-Fi] Attempt " + String(attempt) + "... ");
-
-                // ПРАВКА 5: Очистка старого сокета
-                httpWifi.stop();
-
-                int err = httpWifi.get(path);
-                int statusCode = httpWifi.responseStatusCode();
-
-                // Проверка успеха (Ошибок нет И статус 200 ОК)
-                if (err == 0 && statusCode == 200)
-                {
-                    SerialMon.println("Success!");
-                    httpWifi.responseBody();
-                    sent = true;
-                    break; // Успех, выходим из цикла
-                }
-                else
-                {
-                    SerialMon.print("Error! Code: ");
-                    SerialMon.print(err); // -1...-4 это ошибки сети
-                    SerialMon.print(" | HTTP Status: ");
-                    SerialMon.println(statusCode); // Код ответа сервера
-                    delay(5000);                   // Ждем 5 сек перед повтором
-                }
+                SerialMon.println("Success! (Unlimited)");
+                sent = true;
             }
             else
             {
-                SerialMon.println("[Wi-Fi] No connection.");
-                delay(1000);
+                SerialMon.print("Error: ");
+                SerialMon.println(httpCode);
             }
-        } // Конец цикла попыток Wi-Fi
+            http.end();
+        }
     }
 
-    // --- ШАГ 2: GSM ---
-    // Пробуем если: 1. Wi-Fi не справился (или выключен). 2. GSM включен в настройках.
+    // --- 2. КАНАЛ GSM (РЕЗЕРВ ЧЕРЕЗ PUSHINGBOX) ---
+    // Используется только если Wi-Fi не смог отправить
     if (!sent && ENABLE_GSM)
     {
-        SerialMon.println("[GSM] Switching to Backup Channel...");
+        SerialMon.println("[GSM] Switching to Backup (PushingBox)...");
 
         if (!modem.isGprsConnected())
         {
             SerialMon.print("[GSM] Connecting GPRS... ");
             if (!modem.gprsConnect(apn, user, pass))
             {
-                SerialMon.println("FAIL");
+                SerialMon.println("FAIL. Resetting modem...");
+                modem.restart();
                 return;
             }
             SerialMon.println("OK");
         }
 
-        SerialMon.print("[GSM] Sending... ");
-        httpGsm.stop(); // Очистка сокета
+        // Старый добрый URL для PushingBox
+        String path = "/pushingbox?devid=" + String(DEVID) +
+                      "&val=" + String(val) +
+                      "&device=" + deviceStatus +
+                      "&bat=" + String(batLevel);
 
+        SerialMon.print("[GSM] Sending... ");
+        httpGsm.stop();
         int err = httpGsm.get(path);
+
         if (err == 0)
         {
-            SerialMon.println("Success!");
+            SerialMon.println("Success! (Backup used)");
             httpGsm.responseBody();
         }
         else
@@ -235,13 +218,8 @@ void sendSmart(int val, String deviceStatus, int batLevel)
             SerialMon.println("Error via GSM: " + String(err));
         }
     }
-    else if (!sent && !ENABLE_GSM)
-    {
-        SerialMon.println("Message NOT sent: Wi-Fi failed and GSM is disabled.");
-    }
 }
 
-// === БАТАРЕЯ (ИСПРАВЛЕНО: Два коэффициента) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -253,43 +231,30 @@ int getBatteryPercentage(bool charging)
     float average = sum / 20.0;
     float voltage = 0.0;
 
-    // ВНЕДРЕНА ЛОГИКА ДВУХ КОЭФФИЦИЕНТОВ
     if (charging)
     {
-        // Режим зарядки: 2.05 (Точный замер)
         voltage = (average / 4095.0) * 3.3 * 2.05;
     }
     else
     {
-        // Режим разряда: 2.64 (Компенсация падения на проводах)
-        // Это превратит ваши 2.75В обратно в 3.54В
-        voltage = (average / 4095.0) * 3.3 * 2.5;
+        voltage = (average / 4095.0) * 3.3 * 2.49;
     }
 
     int percentage = 0;
     if (charging)
-    {
-        // Шкала для зарядки
         percentage = map(voltage * 100, 400, 420, 80, 100);
-    }
     else
-    {
-        // Шкала для разряда (восстановленные "честные" вольты)
         percentage = map(voltage * 100, 320, 370, 0, 100);
-    }
 
     if (percentage > 100)
         percentage = 100;
     if (percentage < 0)
         percentage = 0;
 
-    SerialMon.print("Bat Voltage: ");
+    SerialMon.print("Bat: ");
     SerialMon.print(voltage);
-    SerialMon.print("V | Mode: ");
-    SerialMon.print(charging ? "Charging" : "Discharging");
-    SerialMon.print(" | Level: ");
+    SerialMon.print("V | ");
     SerialMon.print(percentage);
     SerialMon.println("%");
-
     return percentage;
 }
