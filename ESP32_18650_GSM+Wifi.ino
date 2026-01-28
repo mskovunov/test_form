@@ -7,7 +7,7 @@
 
 // ================= РЕЖИМЫ РАБОТЫ (ПАНЕЛЬ УПРАВЛЕНИЯ) =================
 // Меняйте true на false, чтобы отключать каналы связи
-const bool ENABLE_WIFI = true; // false = Использовать Wi-Fi (Основной) false
+const bool ENABLE_WIFI = true; // true = Использовать Wi-Fi (Основной) false
 const bool ENABLE_GSM = true;  // true = Использовать GSM (Резервный)
 
 // ================= НАСТРОЙКИ СЕТИ =================
@@ -125,7 +125,7 @@ void loop()
         }
     }
 
-    if (millis() - lastKeepAlive > 60000) // Таймаут отправки данных (60000 - 1мин)
+    if (millis() - lastKeepAlive > 600000) // Таймаут отправки данных (60000 - 1мин)
     {
         int bat = getBatteryPercentage(isPowerOn);
         SerialMon.println("Routine Check...");
@@ -193,7 +193,7 @@ void sendSmart(int val, String deviceStatus, int batLevel)
                     SerialMon.print(err); // -1...-4 это ошибки сети
                     SerialMon.print(" | HTTP Status: ");
                     SerialMon.println(statusCode); // Код ответа сервера
-                    delay(2000);                   // Ждем 2 сек перед повтором
+                    delay(5000);                   // Ждем 5 сек перед повтором
                 }
             }
             else
@@ -241,7 +241,7 @@ void sendSmart(int val, String deviceStatus, int batLevel)
     }
 }
 
-// === БАТАРЕЯ (Коэфф 2.05) ===
+// === БАТАРЕЯ (ИСПРАВЛЕНО: Два коэффициента) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -251,18 +251,31 @@ int getBatteryPercentage(bool charging)
         delay(5);
     }
     float average = sum / 20.0;
+    float voltage = 0.0;
 
-    // ПРАВКА 6: Коэффициент 2.05 (исправляет 4.9В -> 4.2В)
-    float voltage = (average / 4095.0) * 3.3 * 2.05;
+    // ВНЕДРЕНА ЛОГИКА ДВУХ КОЭФФИЦИЕНТОВ
+    if (charging)
+    {
+        // Режим зарядки: 2.05 (Точный замер)
+        voltage = (average / 4095.0) * 3.3 * 2.05;
+    }
+    else
+    {
+        // Режим разряда: 2.64 (Компенсация падения на проводах)
+        // Это превратит ваши 2.75В обратно в 3.54В
+        voltage = (average / 4095.0) * 3.3 * 2.5;
+    }
 
     int percentage = 0;
     if (charging)
     {
+        // Шкала для зарядки
         percentage = map(voltage * 100, 400, 420, 80, 100);
     }
     else
     {
-        percentage = map(voltage * 100, 320, 380, 0, 100);
+        // Шкала для разряда (восстановленные "честные" вольты)
+        percentage = map(voltage * 100, 320, 370, 0, 100);
     }
 
     if (percentage > 100)
