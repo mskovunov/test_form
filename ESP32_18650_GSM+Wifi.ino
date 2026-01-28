@@ -69,7 +69,8 @@ void setup()
         SerialMon.println("Init Wi-Fi...");
         WiFi.mode(WIFI_STA);
         WiFi.begin(wifi_ssid, wifi_pass);
-        httpWifi.setHttpResponseTimeout(15000);
+        // Увеличиваем тайм-аут до 20 секунд (PushingBox бывает медленным)
+        httpWifi.setHttpResponseTimeout(20000);
     }
     else
     {
@@ -127,7 +128,7 @@ void loop()
     delay(100);
 }
 
-// === УМНАЯ ОТПРАВКА С УЧЕТОМ НАСТРОЕК ===
+// === УМНАЯ ОТПРАВКА (С ПОВТОРНЫМИ ПОПЫТКАМИ) ===
 void sendSmart(int val, String deviceStatus, int batLevel)
 {
 
@@ -138,37 +139,55 @@ void sendSmart(int val, String deviceStatus, int batLevel)
 
     bool sent = false;
 
-    // --- ШАГ 1: Wi-Fi ---
-    // Пробуем только если: 1. В настройках включено.
+    // --- ШАГ 1: Wi-Fi с циклом попыток ---
     if (ENABLE_WIFI)
     {
 
-        // Если отвалился - пробуем переподключить
-        if (WiFi.status() != WL_CONNECTED)
+        // Пробуем отправить 3 раза, если возникают ошибки
+        for (int attempt = 1; attempt <= 3; attempt++)
         {
-            SerialMon.print("Wi-Fi lost. Reconnecting");
-            WiFi.reconnect();
-            for (int i = 0; i < 30; i++)
+
+            // 1. Проверка соединения
+            if (WiFi.status() != WL_CONNECTED)
             {
-                if (WiFi.status() == WL_CONNECTED)
-                    break;
-                SerialMon.print(".");
-                delay(100);
+                SerialMon.print("Wi-Fi reconnecting...");
+                WiFi.reconnect();
+                for (int k = 0; k < 20; k++)
+                { // Ждем до 2 сек
+                    if (WiFi.status() == WL_CONNECTED)
+                        break;
+                    delay(100);
+                }
+                SerialMon.println(WiFi.status() == WL_CONNECTED ? "OK" : "Fail");
             }
-            SerialMon.println();
-        }
 
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            SerialMon.print("[Wi-Fi] Sending... ");
-            int err = httpWifi.get(path);
-            int statusCode = httpWifi.responseStatusCode();
-
-            if (err == 0 && statusCode == 200)
+            if (WiFi.status() == WL_CONNECTED)
             {
-                SerialMon.println("Success!");
-                httpWifi.responseBody();
-                sent = true;
+                SerialMon.print("[Wi-Fi] Attempt " + String(attempt) + "... ");
+
+                // ВАЖНО: Закрываем старое соединение перед новым запросом
+                httpWifi.stop();
+
+                int err = httpWifi.get(path);
+                int statusCode = httpWifi.responseStatusCode();
+
+                // Проверка успеха (Ошибок нет И статус 200 ОК)
+                if (err == 0 && statusCode == 200)
+                {
+                    SerialMon.println("Success!");
+                    httpWifi.responseBody();
+                    sent = true;
+                    break; // Выход из цикла попыток, всё получилось!
+                }
+                else
+                {
+                    SerialMon.print("Error: ");
+                    SerialMon.print(err);
+                    SerialMon.print(" | Status: ");
+                    SerialMon.println(statusCode);
+                    // Ждем 2 секунды перед следующей попыткой
+                    delay(2000);
+                }
             }
             else
             {
@@ -181,45 +200,49 @@ void sendSmart(int val, String deviceStatus, int batLevel)
         else
         {
             SerialMon.println("[Wi-Fi] No connection.");
+            delay(1000);
         }
-    }
-
-    // --- ШАГ 2: GSM ---
-    // Пробуем если: 1. Wi-Fi не справился (или выключен). 2. GSM включен в настройках.
-    if (!sent && ENABLE_GSM)
-    {
-        SerialMon.println("[GSM] Switching to Backup Channel...");
-
-        if (!modem.isGprsConnected())
-        {
-            SerialMon.print("[GSM] Connecting GPRS... ");
-            if (!modem.gprsConnect(apn, user, pass))
-            {
-                SerialMon.println("FAIL");
-                return;
-            }
-            SerialMon.println("OK");
-        }
-
-        SerialMon.print("[GSM] Sending... ");
-        int err = httpGsm.get(path);
-        if (err == 0)
-        {
-            SerialMon.println("Success!");
-            httpGsm.responseBody();
-        }
-        else
-        {
-            SerialMon.println("Error via GSM: " + String(err));
-        }
-    }
-    else if (!sent && !ENABLE_GSM)
-    {
-        SerialMon.println("Message NOT sent: Wi-Fi failed and GSM is disabled.");
-    }
+    } // конец цикла попыток
 }
 
-// === БАТАРЕЯ (Коэфф 2.40) ===
+// --- ШАГ 2: GSM (Только если Wi-Fi не справился за 3 попытки) ---
+if (!sent && ENABLE_GSM)
+{
+    SerialMon.println("[GSM] Switching to Backup Channel...");
+
+    if (!modem.isGprsConnected())
+    {
+        SerialMon.print("[GSM] Connecting GPRS... ");
+        if (!modem.gprsConnect(apn, user, pass))
+        {
+            SerialMon.println("FAIL");
+            return;
+        }
+        SerialMon.println("OK");
+    }
+
+    SerialMon.print("[GSM] Sending... ");
+    // Тут тоже полезно закрыть старый сокет
+    httpGsm.stop();
+
+    int err = httpGsm.get(path);
+    if (err == 0)
+    {
+        SerialMon.println("Success!");
+        httpGsm.responseBody();
+    }
+    else
+    {
+        SerialMon.println("Error via GSM: " + String(err));
+    }
+}
+else if (!sent && !ENABLE_GSM)
+{
+    SerialMon.println("FAILED. Wi-Fi attempts exhausted, GSM disabled.");
+}
+}
+
+// === БАТАРЕЯ (Новый Коэфф 2.05) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -230,7 +253,9 @@ int getBatteryPercentage(bool charging)
     }
     float average = sum / 20.0;
 
-    float voltage = (average / 4095.0) * 3.3 * 2.40;
+    // ИСПРАВЛЕНИЕ: Снизили с 2.35 до 2.05
+    // Чтобы убрать завышенные показания (4.9В -> 4.2В)
+    float voltage = (average / 4095.0) * 3.3 * 2.05;
 
     int percentage = 0;
     if (charging)
@@ -239,7 +264,7 @@ int getBatteryPercentage(bool charging)
     }
     else
     {
-        percentage = map(voltage * 100, 320, 380, 0, 100);
+        percentage = map(voltage * 100, 320, 370, 0, 100);
     }
 
     if (percentage > 100)
