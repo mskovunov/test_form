@@ -1,0 +1,58 @@
+function doGet(e) {
+  // 1. Получаем данные от ESP32
+  var value = e.parameter.val || "0";
+  var device = e.parameter.device || "Unknown";
+  var battery = e.parameter.bat || "0"; 
+  
+  // НОВОЕ: Получаем вольтаж. Если нет, шлем 0.0
+  var voltage = e.parameter.volt || "0.0"; 
+  
+  // 2. Ваши настройки Firestore
+  var FIREBASE_PROJECT_ID = "meter-form"; 
+  var FIREBASE_API_KEY    = "AIzaSyAsr-JbArcAu-7_csBxM6VDsC7hyPz7qB0";
+  var COLLECTION_NAME     = "esp32_data"; 
+  
+  // 3. Формируем URL
+  var url = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + 
+            "/databases/(default)/documents/" + COLLECTION_NAME + "?key=" + FIREBASE_API_KEY;
+
+  // 4. Формируем JSON-пакет
+  var payload = {
+    "fields": {
+      "value": { "integerValue": value },
+      "device": { "stringValue": device },
+      "battery": { "integerValue": battery }, 
+      
+      // НОВОЕ ПОЛЕ: Сохраняем вольтаж как дробное число (doubleValue)
+      "voltage": { "doubleValue": voltage }, 
+      
+      "timestamp": { "timestampValue": new Date().toISOString() }
+    }
+  };
+
+  // 5. Настройки запроса
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true 
+  };
+
+  // 6. Отправляем запрос в Firestore
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var respCode = response.getResponseCode();
+    
+    if (respCode == 200) {
+      return ContentService.createTextOutput("Success: Data saved to Firestore");
+    } else {
+      return ContentService.createTextOutput("Error Firestore: " + response.getContentText());
+    }
+  } catch (error) {
+    return ContentService.createTextOutput("Script Error: " + error.toString());
+  }
+}
+
+function forceAuth() {
+  UrlFetchApp.fetch("https://www.google.com");
+}

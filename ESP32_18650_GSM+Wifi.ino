@@ -42,6 +42,10 @@ HttpClient httpGsm(clientGsm, "api.pushingbox.com", 80);
 bool isPowerOn = true;
 unsigned long lastKeepAlive = 0;
 
+// Предварительное объявление функций, чтобы не было ошибок компиляции
+int getBatteryPercentage(bool charging, float &outVoltage);
+void sendSmart(int val, String deviceStatus, int batLevel, float voltage);
+
 void setup()
 {
     SerialMon.begin(115200);
@@ -83,9 +87,15 @@ void setup()
         SerialMon.println("STARTUP: Power OFF");
     }
 
-    // ПРАВКА 3: Отправляем приветственное сообщение, чтобы убедиться, что система не зависла    SerialMon.println("Setup Done. Sending Boot Info...");
-    int bat = getBatteryPercentage(isPowerOn);
-    sendSmart(1, "SystemStart", bat);
+    // ПРАВКА 3: Отправляем приветственное сообщение, чтобы убедиться, что система не зависла
+    SerialMon.println("Setup Done. Sending Boot Info...");
+
+    // ИЗМЕНЕНИЕ: Добавили переменную для вольтажа
+    float currentVolt = 0.0;
+    int bat = getBatteryPercentage(isPowerOn, currentVolt);
+
+    // ИЗМЕНЕНИЕ: Передаем вольтаж в sendSmart
+    sendSmart(1, "SystemStart", bat, currentVolt);
 }
 
 void loop()
@@ -99,16 +109,20 @@ void loop()
         if (digitalRead(MAINS_PIN) == sensorVal)
         {
             isPowerOn = currentReading;
-            int bat = getBatteryPercentage(isPowerOn);
+
+            // ИЗМЕНЕНИЕ: Получаем вольтаж
+            float currentVolt = 0.0;
+            int bat = getBatteryPercentage(isPowerOn, currentVolt);
+
             if (isPowerOn)
             {
                 SerialMon.println("EVENT: Power Restored");
-                sendSmart(1, "PowerRestored", bat);
+                sendSmart(1, "PowerRestored", bat, currentVolt);
             }
             else
             {
                 SerialMon.println("EVENT: Power Lost");
-                sendSmart(0, "PowerLost", bat);
+                sendSmart(0, "PowerLost", bat, currentVolt);
             }
         }
     }
@@ -117,15 +131,19 @@ void loop()
     // Wi-Fi "бесплатный", а GSM будет тратить лимит PushingBox только при аварии
     if (millis() - lastKeepAlive > 600000)
     {
-        int bat = getBatteryPercentage(isPowerOn);
+        // ИЗМЕНЕНИЕ: Получаем вольтаж
+        float currentVolt = 0.0;
+        int bat = getBatteryPercentage(isPowerOn, currentVolt);
+
         SerialMon.println("Routine Check...");
-        sendSmart(isPowerOn ? 1 : 0, "RoutineCheck", bat);
+        sendSmart(isPowerOn ? 1 : 0, "RoutineCheck", bat, currentVolt);
         lastKeepAlive = millis();
     }
     delay(100);
 }
 
-void sendSmart(int val, String deviceStatus, int batLevel)
+// ИЗМЕНЕНИЕ: Добавлен аргумент float voltage
+void sendSmart(int val, String deviceStatus, int batLevel, float voltage)
 {
     bool sent = false;
 
@@ -156,6 +174,7 @@ void sendSmart(int val, String deviceStatus, int batLevel)
             url += "?val=" + String(val);
             url += "&device=" + deviceStatus;
             url += "&bat=" + String(batLevel);
+            url += "&volt=" + String(voltage, 2); // ИЗМЕНЕНИЕ: Добавлен вольтаж в URL
 
             // ВАЖНО: Разрешаем переадресацию (Google всегда делает Redirect 302)
             http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -202,7 +221,8 @@ void sendSmart(int val, String deviceStatus, int batLevel)
         String path = "/pushingbox?devid=" + String(DEVID) +
                       "&val=" + String(val) +
                       "&device=" + deviceStatus +
-                      "&bat=" + String(batLevel);
+                      "&bat=" + String(batLevel) +
+                      "&volt=" + String(voltage, 2); // ИЗМЕНЕНИЕ: Добавлен вольтаж в URL
 
         SerialMon.print("[GSM] Sending... ");
         httpGsm.stop();
@@ -221,7 +241,8 @@ void sendSmart(int val, String deviceStatus, int batLevel)
 }
 
 // === БАТАРЕЯ (ПЕРЕСЧИТАНО ПОД ХОРОШУЮ ПАЙКУ) ===
-int getBatteryPercentage(bool charging)
+// ИЗМЕНЕНИЕ: Функция теперь принимает ссылку на переменную outVoltage, чтобы вернуть точное значение
+int getBatteryPercentage(bool charging, float &outVoltage)
 {
     long sum = 0;
     for (int i = 0; i < 20; i++)
@@ -230,25 +251,25 @@ int getBatteryPercentage(bool charging)
         delay(5);
     }
     float average = sum / 20.0;
-    float voltage = 0.0;
 
+    // ИЗМЕНЕНИЕ: Пишем результат сразу в переданную переменную outVoltage
     if (charging)
     {
         // Свет есть: коэффициент 2.14 (Оставляем, он точный)
-        voltage = (average / 4095.0) * 3.3 * 2.14;
+        outVoltage = (average / 4095.0) * 3.3 * 2.14;
     }
     else
     {
         // Света нет: Снижаем с 2.33 до 2.25
         // Теперь напряжение не будет "подпрыгивать" при отключении света
-        voltage = (average / 4095.0) * 3.3 * 2.25;
+        outVoltage = (average / 4095.0) * 3.3 * 2.25;
     }
 
     int percentage = 0;
     if (charging)
-        percentage = map(voltage * 100, 400, 420, 80, 100);
+        percentage = map(outVoltage * 100, 400, 420, 80, 100);
     else
-        percentage = map(voltage * 100, 320, 370, 0, 100);
+        percentage = map(outVoltage * 100, 320, 370, 0, 100);
 
     if (percentage > 100)
         percentage = 100;
@@ -256,7 +277,7 @@ int getBatteryPercentage(bool charging)
         percentage = 0;
 
     SerialMon.print("Bat: ");
-    SerialMon.print(voltage);
+    SerialMon.print(outVoltage);
     SerialMon.print("V | ");
     SerialMon.print(percentage);
     SerialMon.println("%");
