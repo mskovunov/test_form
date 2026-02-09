@@ -15,7 +15,7 @@ const char *wifi_pass = "Am5084ak";
 
 // --- НАСТРОЙКИ ДЛЯ БЕЗЛИМИТНОГО WI-FI (Google) ---
 // Вставьте сюда ID вашего скрипта (Длинная строка из URL между /s/ и /exec)
-String GAS_SCRIPT_ID = "ВСТАВЬТЕ_СЮДА_ВАШ_GOOGLE_SCRIPT_ID";
+String GAS_SCRIPT_ID = "AKfycbyvn_NXzYXWankzZan3efMbUaQZNpjjNCBcmJNrGPHHkUoAfASHqMpmiy_Sm_Yuzt4d";
 
 // --- НАСТРОЙКИ ДЛЯ РЕЗЕРВНОГО GSM (PushingBox) ---
 const char apn[] = "internet";
@@ -115,7 +115,7 @@ void loop()
 
     // ТЕПЕРЬ МОЖНО ЧАЩЕ! Например, раз в 5 минут (300000 мс)
     // Wi-Fi "бесплатный", а GSM будет тратить лимит PushingBox только при аварии
-    if (millis() - lastKeepAlive > 300000)
+    if (millis() - lastKeepAlive > 600000)
     {
         int bat = getBatteryPercentage(isPowerOn);
         SerialMon.println("Routine Check...");
@@ -220,6 +220,7 @@ void sendSmart(int val, String deviceStatus, int batLevel)
     }
 }
 
+// === БАТАРЕЯ (ПЕРЕСЧИТАНО ПОД ХОРОШУЮ ПАЙКУ) ===
 int getBatteryPercentage(bool charging)
 {
     long sum = 0;
@@ -233,11 +234,14 @@ int getBatteryPercentage(bool charging)
 
     if (charging)
     {
-        voltage = (average / 4095.0) * 3.3 * 2.05;
+        // Свет есть: коэффициент 2.14 (Оставляем, он точный)
+        voltage = (average / 4095.0) * 3.3 * 2.14;
     }
     else
     {
-        voltage = (average / 4095.0) * 3.3 * 2.49;
+        // Света нет: Снижаем с 2.33 до 2.25
+        // Теперь напряжение не будет "подпрыгивать" при отключении света
+        voltage = (average / 4095.0) * 3.3 * 2.25;
     }
 
     int percentage = 0;
