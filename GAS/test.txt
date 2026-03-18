@@ -4,9 +4,11 @@
  * 1. getLast: Получение последнего показателя (для поля "Було").
  * 2. getPortStatus: Получение статуса порта зарядки из H1.
  * 3. history: Получение отфильтрованной истории показаний.
+
+ 
  */
 function doGet(e) {
-  const sheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+  const sheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                              .getSheetByName("Парковка");
 
   // Получение последнего значения (для поля "було")
@@ -88,23 +90,17 @@ function doGet(e) {
       .sort((a, b) => b.dateObj - a.dateObj); // Сортировка по убыванию даты (новые сверху)
 
 
-    // Формируем HTML-таблицу
-    let html = '<div id="history"><h3>Останні показники</h3><table><thead><tr><th>Дата</th><th>Корист.</th><th>Було</th><th>Стало</th><th>Різниця</th></tr></thead><tbody>';
+    // Формируем JSON-ответ (Шаг 2 архитектурного рефакторинга)
+    const results = filtered.map(row => ({
+      date: row.formattedDate,
+      user: row.user,
+      from: (typeof row.from === 'number') ? row.from.toFixed(1) : row.from,
+      to: (typeof row.to === 'number') ? row.to.toFixed(1) : row.to,
+      diff: (typeof row.diff === 'number') ? row.diff.toFixed(1) : row.diff
+    }));
 
-    filtered.forEach(row => {
-      // ИЗМЕНЕНИЕ 3: Применение toFixed(1) к полю diff для корректного отображения в таблице
-      html += `<tr>
-        <td>${row.formattedDate}</td>
-        <td>${row.user}</td>
-        <td>${(typeof row.from === 'number') ? row.from.toFixed(1) : row.from}</td>
-        <td>${(typeof row.to === 'number') ? row.to.toFixed(1) : row.to}</td>
-        <td>${(typeof row.diff === 'number') ? row.diff.toFixed(1) : row.diff}</td>
-      </tr>`;
-    });
-
-    html += '</tbody></table></div>';
-
-    return ContentService.createTextOutput(html).setMimeType(ContentService.MimeType.TEXT);
+    return ContentService.createTextOutput(JSON.stringify(results))
+                         .setMimeType(ContentService.MimeType.JSON);
   }
 
   // По умолчанию
@@ -118,7 +114,7 @@ function doGet(e) {
  * 2. Обновления статуса порта.
  */
 function doPost(e) {
-  const sheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+  const sheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                              .getSheetByName("Парковка");
 
   // VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
@@ -127,7 +123,7 @@ function doPost(e) {
     try {
       const rowNum = parseInt(e.parameter.row);
       const targetColumn = parseInt(e.parameter.column);
-      const configSheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+      const configSheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                                        .getSheetByName("Config");
       
       // 1. ОБНОВЛЕНИЕ EMAIL (Колонка 4 / D)
@@ -255,7 +251,7 @@ if (e.parameter.portStatus !== undefined) {
  */
 function getRecipientList() {
   // ИЗМЕНЕНИЕ: Получаем лист "Config"
-  const configSheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+  const configSheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                              .getSheetByName("Config"); 
   
   if (!configSheet) {
@@ -303,7 +299,7 @@ function getRecipientList() {
  * Используется страницей settings.html.
  */
 function getConfigRecipients() {
-  const configSheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+  const configSheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                              .getSheetByName("Config"); 
   
   if (!configSheet) {
@@ -342,7 +338,7 @@ function getConfigRecipients() {
  * Вспомогательная функция для получения последнего значения из столбца D.
  */
 function getLastValToUse() {
-  const sheet = SpreadsheetApp.openById("1HgJDnd3ua_Z7OFU1nSEW1jaHVgiFzx_FBthYTnPMaxo")
+  const sheet = SpreadsheetApp.openById("18qYll4Qm1pJTOCT3q2foEYPn41_DeNbJWHPNRdYmtNs")
                               .getSheetByName("Парковка");
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return '';

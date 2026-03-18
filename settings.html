@@ -126,6 +126,8 @@
 
     <!-- Подключаем файл конфигурации ПЕРЕД основным скриптом -->
     <script src="config.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
 
     <script>
@@ -219,12 +221,7 @@
           // ГАРАНТИРУЕМ, что column передается как строка
           formData.append("column", "4"); // Колонка D (Email) имеет индекс 4 (A=1, B=2, C=3, D=4)
 
-          const resp = await fetch(WEBAPP_URL, {
-            method: "POST",
-            body: formData,
-          });
-
-          const responseText = await resp.text();
+          const responseText = await GasService.updateConfig(formData);
 
           if (responseText.includes("Success")) {
             statusDiv.innerHTML = `✅ Email оновлено успішно на: ${newEmail}`;
@@ -304,11 +301,7 @@
           formData.append("status", newStatus);
           formData.append("column", targetColumn);
 
-          const resp = await fetch(WEBAPP_URL, {
-            method: "POST",
-            body: formData,
-          });
-          const responseText = await resp.text();
+          const responseText = await GasService.updateConfig(formData);
 
           if (responseText.includes("Success")) {
             // Выводим успех
@@ -418,8 +411,7 @@
 
         try {
           // Запрос к GAS для получения данных в формате JSON
-          const resp = await fetch(WEBAPP_URL + "?getConfig=1");
-          const dataText = await resp.text(); // Ожидаем TEXT для CORS
+          const dataText = await GasService.getConfig();
           const data = JSON.parse(dataText);
 
           appData = data; // Сохраняем данные глобально

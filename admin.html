@@ -84,6 +84,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="./firebase-init.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
 
     <script>
@@ -98,12 +100,10 @@
           return;
         }
 
-        const userRef = db.collection("users").doc(user.uid);
         try {
-          const doc = await userRef.get();
-          const data = doc.data();
+          const data = await FirebaseService.getUserData(user);
 
-          if (doc.exists && data.role === "admin") {
+          if (data && data.role === "admin") {
             isAdmin = true;
             // Администратор, загружаем логи
             loadPortLogs();
@@ -132,19 +132,14 @@
 
         try {
           // Получаем логи, сортируем по времени (новые сверху)
-          const logsRef = db.collection("port_logs");
-          const snapshot = await logsRef
-            .orderBy("timestamp", "desc")
-            .limit(200)
-            .get(); // Ограничение в 200 логов
+          const logData = await FirebaseService.getPortLogs(200);
 
           statusDiv.style.display = "none";
 
-          if (snapshot.empty) {
+          if (!logData || logData.length === 0) {
             logDiv.innerHTML =
               '<p style="text-align: center;">Логи перемикання порту не знайдено.</p>';
           } else {
-            const logData = snapshot.docs.map((doc) => doc.data());
             renderLogTable(logData, logDiv);
           }
         } catch (error) {

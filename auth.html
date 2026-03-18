@@ -293,6 +293,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
     <script src="./firebase-init.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="config.js"></script>
     <script src="utils.js"></script>
 
@@ -339,81 +341,7 @@
         }
       }
 
-      /* --- НОВЫЕ ФУНКЦИИ ДЛЯ USERNAME/EMAIL В FIRESTORE --- */
-
-      // 1.1 Поиск Email в Firestore по Username (для ВХОДА)
-      async function findEmailByUsername(username) {
-        const usersRef = db.collection("users");
-        const searchUsername = username.toLowerCase();
-        const snapshot = await usersRef
-          .where("usernameLower", "==", searchUsername)
-          .limit(1)
-          .get();
-
-        if (snapshot.empty) {
-          return null;
-        }
-        return snapshot.docs[0].data().email;
-      }
-
-      // 1.2 Проверка уникальности usernameLower
-      async function checkUsernameUnique(username) {
-        const usersRef = db.collection("users");
-
-        // Приводим входной username к нижнему регистру для поиска
-        const searchUsername = username.toLowerCase();
-
-        // Ищем совпадения в поле usernameLower
-        const snapshot = await usersRef
-          .where("usernameLower", "==", searchUsername)
-          .limit(1)
-          .get();
-
-        // Возвращаем true, если совпадений нет (уникален)
-        return snapshot.empty;
-      }
-
-      // 2. ФУНКЦИЯ ДЛЯ ЗАПИСИ ДАННЫХ В FIRESTORE (ОБНОВЛЕНО ДЛЯ USERNAME)
-      async function saveUserData(user, username = null) {
-        if (!user) return;
-        const userRef = db.collection("users").doc(user.uid);
-
-        const updateData = {
-          email: user.email,
-          lastSignInTime: firebase.firestore.FieldValue.serverTimestamp(),
-        };
-
-        if (username) {
-          updateData.username = username;
-          // ДОБАВЛЕНО: Сохраняем версию в нижнем регистре для поиска
-          updateData.usernameLower = username.toLowerCase();
-        }
-
-        try {
-          if (
-            user.metadata &&
-            user.metadata.creationTime === user.metadata.lastSignInTime
-          ) {
-            updateData.createdAt =
-              firebase.firestore.FieldValue.serverTimestamp();
-          }
-        } catch (e) {
-          updateData.createdAt =
-            firebase.firestore.FieldValue.serverTimestamp();
-        }
-
-        await userRef
-          .set(updateData, { merge: true })
-          .then(() => {
-            console.log("Данные пользователя успешно сохранены в Firestore.");
-          })
-          .catch((error) => {
-            console.error(
-              "Ошибка при записи данных пользователя в Firestore:",
-              error
-            );
-          });
-      }
+      /* Функции работы с БД перенесены в FirebaseService */
 
       window.addEventListener("DOMContentLoaded", async () => {
         // Применяем тему
@@ -506,7 +434,7 @@
               };
             }
 
-            const isUnique = await checkUsernameUnique(username);
+            const isUnique = await FirebaseService.checkUsernameUnique(username);
             if (!isUnique) {
               throw {
                 code: "auth/username-already-in-use",
@@ -520,7 +448,7 @@
               password
             );
             const user = userCredential.user;
-            await saveUserData(userCredential.user, username);
+            await FirebaseService.saveUserAuthData(userCredential.user, username);
 
             // НОВОЕ: Отправка письма для верификации
             await user.sendEmailVerification();
@@ -575,7 +503,7 @@
             const usernameInput = usernameLoginInput.value; // Берем значение из поля (например, 'egolf')
 
             // 1. Ищем email (логика без учета регистра)
-            const email = await findEmailByUsername(usernameInput);
+            const email = await FirebaseService.findEmailByUsername(usernameInput);
 
             if (!email) {
               throw {
@@ -602,7 +530,7 @@
             // 4. Обновление данных (только lastSignInTime).
             // Если originalUsername найден, мы передаем его, чтобы он не был перезаписан нижним регистром.
             // Если его нет (хотя не должно быть), мы используем значение из поля ввода для страховки.
-            await saveUserData(user, originalUsername || usernameInput);
+            await FirebaseService.saveUserAuthData(user, originalUsername || usernameInput);
           } catch (error) {
             let errorMessage = "Помилка: " + error.message;
 
@@ -636,7 +564,7 @@
           try {
             const userCredential = await auth.signInWithPopup(provider);
 
-            await saveUserData(userCredential.user);
+            await FirebaseService.saveUserAuthData(userCredential.user);
           } catch (error) {
             let errorMessage = "Помилка входу через Google.";
 
@@ -678,7 +606,7 @@
             }
 
             // 1. Находим email по username
-            const email = await findEmailByUsername(username);
+            const email = await FirebaseService.findEmailByUsername(username);
 
             if (!email) {
               throw new Error("Користувач з таким логіном не знайдений.");

@@ -12,6 +12,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="./firebase-init.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
 
     <script>
@@ -85,26 +87,28 @@
         statusDiv.style.display = "block";
         historyDiv.innerHTML = "";
 
-        let url = WEBAPP_URL + "?history=1";
-
-        // Если выбран конкретный месяц, добавляем его в URL
-        if (selectedMonth) {
-          url += `&month=${selectedMonth}`;
-        } else {
-          // ИЗМЕНЕНИЕ ЗДЕСЬ: Обновляем статус, если выбрана вся история
+        if (!selectedMonth) {
           statusDiv.innerHTML = `⏳ Завантаження усієї історії...`;
         }
 
         try {
-          const resp = await fetch(url);
-          const html = await resp.text();
+          const jsonStr = await GasService.getHistory(selectedMonth);
+          const data = JSON.parse(jsonStr);
 
-          // ... (остальной код проверки на пустоту) ...
-
-          if (html.trim() === "" || html.length < 50) {
-            // Это сообщение отобразится, если выбрана "Уся історія", а данных нет.
+          if (!data || data.length === 0) {
             historyDiv.innerHTML = `<p style="text-align: center; color: var(--text-color); margin-top: 30px;">Записів за ${monthName} не знайдено.</p>`;
           } else {
+            let html = '<div id="history"><h3>Останні показники</h3><table><thead><tr><th>Дата</th><th>Корист.</th><th>Було</th><th>Стало</th><th>Різниця</th></tr></thead><tbody>';
+            data.forEach(row => {
+                html += `<tr>
+                    <td>${row.date}</td>
+                    <td>${row.user}</td>
+                    <td>${row.from}</td>
+                    <td>${row.to}</td>
+                    <td>${row.diff}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
             historyDiv.innerHTML = html;
           }
 

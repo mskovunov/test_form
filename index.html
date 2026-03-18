@@ -170,8 +170,21 @@
             content.style.maxHeight = (content.scrollHeight + 50) + "px";
 
             try {
-                const resp = await fetch(WEBAPP_URL + '?history=1');
-                const html = await resp.text();
+                const jsonStr = await GasService.getHistory();
+                const data = JSON.parse(jsonStr);
+                
+                let html = '<div id="history"><h3>Останні показники</h3><table><thead><tr><th>Дата</th><th>Корист.</th><th>Було</th><th>Стало</th><th>Різниця</th></tr></thead><tbody>';
+                data.forEach(row => {
+                    html += `<tr>
+                        <td>${row.date}</td>
+                        <td>${row.user}</td>
+                        <td>${row.from}</td>
+                        <td>${row.to}</td>
+                        <td>${row.diff}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+                
                 historyDiv.innerHTML = html;
             } catch (err) {
                 historyDiv.innerHTML = '<p style="color: var(--status-error); text-align: center;">⚠️ Помилка при завантаженні історії.</p>';
@@ -190,8 +203,7 @@
 
     async function loadPreviousReading() {
       try {
-        const resp = await fetch(WEBAPP_URL + '?getLast=1');
-        const val = await resp.text();
+        const val = await GasService.getLastReading();
         document.getElementById('prevReading').value = val;
       } catch (err) {
         console.error('Помилка при отриманні попереднього показника:', err);
@@ -203,8 +215,7 @@
         const loader = document.getElementById('portLoader');
         
         try {
-            const resp = await fetch(WEBAPP_URL + '?getPortStatus=1');
-            const status = (await resp.text()).trim(); 
+            const status = (await GasService.getPortStatus()).trim(); 
             localStorage.setItem("portStatus", status); 
             updatePortToggleUI(status);
         } catch (err) {
@@ -250,8 +261,7 @@ function updatePortToggleUI(status) {
       updatePortToggleUI(status);
 	  // 1. ДОБАВЛЕНО: Логирование в Firestore
 		if (user) {
-			// Мы вызываем асинхронную функцию, но не ждем ее, чтобы не задерживать UI
-			logPortStatusChange(user, status, username);
+			FirebaseService.logPortStatusChange(user, status, username);
 		}
 
 	  // 2. ДОБАВЛЕН ВЫЗОВ УВЕДОМЛЕНИЯ ANDROID
@@ -271,12 +281,7 @@ function updatePortToggleUI(status) {
           AndroidNotifier.showNotification(notificationTitle, notificationMessage);
       }
 	  // 3. Отправка данных в Google Apps Script (GAS)
-      fetch(WEBAPP_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ portStatus: statusValue })
-      })
-      .then(res => res.text())
+      GasService.setPortStatus(statusValue)
       .then(console.log)
       .catch(console.error);
     }
@@ -319,30 +324,17 @@ e.preventDefault();
       status.classList.remove('success', 'error', 'show');
       status.classList.add('show'); // Класс 'show' делает его видимым
 
-const data = new URLSearchParams();
-data.append("name", form.name.value);
-data.append("reading", form.reading.value);
-
 let success = false;
 	  const currentSelectedUser = form.name.value;
 	  
 try {
-const response = await fetch(WEBAPP_URL, {
-method: "POST",
-headers: { "Content-Type": "application/x-www-form-urlencoded" },
-body: data.toString(),
-});
-        // ВАЖНОЕ ИЗМЕНЕНИЕ: Читаем ответ как текст, чтобы избежать сбоев при обработке редиректа в GAS.
-        const responseText = await response.text(); 
-        
-        // Проверяем статус ответа
-        if (response.ok) {
+        const responseText = await GasService.submitReading(form.name.value, form.reading.value);
+        if (responseText === "Success") {
             success = true;
         } else {
             console.error("GAS вернул ошибку:", responseText);
             success = false;
         }
-
 } catch (err) {
 console.error("Помилка при відправці:", err);
 success = false;
@@ -388,37 +380,20 @@ success = false;
 				adminMenuItem.style.display = 'none';
 			}
             
-            if (typeof db === 'undefined') {
-                console.error("Firestore не инициализирован. Не могу загрузить username.");
-                return; // Оставляем пустым
+            const data = await FirebaseService.getUserData(user);
+            if (data) {
+                // 1. Отображение Username
+                if (data.username) {
+                    currentUsername = data.username; 
+                    displayElement.textContent = data.username;
+                    setFormUser(currentUsername); 
+                }
+                
+                // 2. Проверка и отображение меню администратора
+                if (adminMenuItem && data.role === 'admin') {
+                    adminMenuItem.style.display = 'list-item';
+                }
             }
-            
-            const userRef = db.collection('users').doc(user.uid);
-            
-		userRef.get().then((doc) => {
-        if (doc.exists) {
-            const data = doc.data();
-            
-            // 1. Отображение Username
-            if (data.username) {
-				currentUsername = data.username; // СОХРАНЯЕМ ИМЯ в глобальную переменную
-                displayElement.textContent = data.username;
-				setFormUser(currentUsername); // НОВОЕ: Вызываем функцию для установки значения в select
-            } else {
-                console.warn("Username не найден в Firestore. Оставляем поле пустым.");
-            }
-            
-            // 2. Проверка и отображение меню администратора (НОВОЕ)
-            if (adminMenuItem && data.role === 'admin') {
-                adminMenuItem.style.display = 'list-item'; // Показываем пункт меню
-                console.log("Пользователь является администратором. Отображена админ-панель.");
-            }
-        } else {
-            console.warn("Документ пользователя не найден в Firestore.");
-        }
-    }).catch((error) => {
-        console.error("Ошибка при получении данных пользователя из Firestore:", error);
-    });
 	}
 	
 	function setFormUser(username) {
@@ -445,39 +420,7 @@ success = false;
     }
 	}
 		
-		// --- НОВАЯ ФУНКЦИЯ: Логирование статуса порта в Firestore ---
-	async function logPortStatusChange(user, newStatus, username) {
-    if (!user || typeof db === 'undefined') {
-        console.warn("Firestore або користувач не ініціалізовані. Логування неможливе.");
-        return;
-    }
 
-    // Форматирование времени в dd.MM.yyyy HH:mm:ss
-    const now = new Date();
-    const dateTimeString = now.toLocaleDateString('uk-UA', { 
-        day: '2-digit', month: '2-digit', year: 'numeric', 
-        hour: '2-digit', minute: '2-digit', second: '2-digit', 
-        hour12: false 
-    }).replace(',', ''); // Удаляем запятую, если она есть в локальном формате
-
-    try {
-        const logData = {
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(), // Время на сервере
-            localTime: dateTimeString, // Время в нужном формате
-            userId: user.uid,
-            username: username || user.email, // Используем username или email как запасной вариант
-            status: newStatus, // "busy" или "available"
-            statusUA: (newStatus === "busy" ? "Зайнятий" : "Доступний")
-        };
-
-        // Запись в коллекцию 'port_logs'
-        await db.collection('port_logs').add(logData);
-        console.log("Лог статуса порта успешно записан в Firestore:", logData);
-
-    } catch (error) {
-        console.error("Ошибка при записи лога порта в Firestore:", error);
-    }
-}
 		
   </script>
   
@@ -485,6 +428,8 @@ success = false;
 	<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>	
 	<script src="./firebase-init.js"></script>
+	<script src="./api/gas-service.js"></script>
+	<script src="./api/firebase-service.js"></script>
 	
 	<script>
 	// Проверка статуса авторизации при загрузке страницы
