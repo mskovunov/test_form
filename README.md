@@ -1,5 +1,6 @@
 v2026.03.25.1859
 - Dual Database Write (Firestore + GAS)
+- Синхронізація даних з GAS в Firestore
 
 v2026.03.25.1759
 

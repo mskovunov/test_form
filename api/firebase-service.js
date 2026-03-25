@@ -181,9 +181,8 @@ const FirebaseService = (function() {
                         const dd = String(date.getDate()).padStart(2, '0');
                         const mm = String(date.getMonth() + 1).padStart(2, '0');
                         const yyyy = date.getFullYear();
-                        const HH = String(date.getHours()).padStart(2, '0');
-                        const MM = String(date.getMinutes()).padStart(2, '0');
-                        dateStr = `${dd}.${mm}.${yyyy} ${HH}:${MM}`;
+                        // Відображаємо тільки дату (без часу)
+                        dateStr = `${dd}.${mm}.${yyyy}`;
                     }
 
                     data.push({

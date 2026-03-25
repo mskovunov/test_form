@@ -72,8 +72,8 @@ function doGet(e) {
         
         return {
           dateObj: parsedDate,
-          // Формат даты без времени (dd.MM.yyyy)
-          formattedDate: Utilities.formatDate(parsedDate, Session.getScriptTimeZone(), "dd.MM.yyyy"), 
+          // Формат даты с сохранением времени (dd.MM.yyyy HH:mm:ss) для точной миграции
+          formattedDate: Utilities.formatDate(parsedDate, Session.getScriptTimeZone(), "dd.MM.yyyy HH:mm:ss"), 
           user: row[1],
           from: row[2],
           to: row[3],
