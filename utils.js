@@ -23,6 +23,35 @@ async function loadComponent(targetId, filePath) {
     }
 }
 
+/**
+ * Shared logic to load the User UI across the application, handling the sidebar and username.
+ * Requires FirebaseService.
+ */
+async function loadUserUI(user) {
+    if (!user) return null;
+    const displayElement = document.getElementById('user-email-display');
+    const adminMenuItem = document.getElementById('admin-menu-item'); 
+    
+    // Скрываем меню по умолчанию
+    if (adminMenuItem) {
+        adminMenuItem.style.display = 'none';
+    }
+    
+    const data = await FirebaseService.getUserData(user);
+    if (data) {
+        // 1. Отображение Username
+        if (data.username && displayElement) {
+            displayElement.textContent = data.username;
+        }
+        
+        // 2. Проверка и отображение меню администратора
+        if (adminMenuItem && data.role === 'admin') {
+            adminMenuItem.style.display = 'list-item';
+        }
+    }
+    return data;
+}
+
 function toggleTheme() {
     const isDark = document.body.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');

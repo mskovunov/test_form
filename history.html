@@ -92,7 +92,7 @@
         }
 
         try {
-          const jsonStr = await GasService.getHistory(selectedMonth);
+          const jsonStr = await FirebaseService.getManualReadingsHistory(selectedMonth);
           const data = JSON.parse(jsonStr);
 
           if (!data || data.length === 0) {

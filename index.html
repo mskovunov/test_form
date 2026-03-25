@@ -170,7 +170,7 @@
             content.style.maxHeight = (content.scrollHeight + 50) + "px";
 
             try {
-                const jsonStr = await GasService.getHistory();
+                const jsonStr = await FirebaseService.getManualReadingsHistory();
                 const data = JSON.parse(jsonStr);
                 
                 let html = '<div id="history"><h3>Останні показники</h3><table><thead><tr><th>Дата</th><th>Корист.</th><th>Було</th><th>Стало</th><th>Різниця</th></tr></thead><tbody>';
@@ -203,8 +203,8 @@
 
     async function loadPreviousReading() {
       try {
-        const val = await GasService.getLastReading();
-        document.getElementById('prevReading').value = val;
+        const val = await FirebaseService.getLastManualReading();
+        document.getElementById('prevReading').value = val || '';
       } catch (err) {
         console.error('Помилка при отриманні попереднього показника:', err);
       }
@@ -215,7 +215,7 @@
         const loader = document.getElementById('portLoader');
         
         try {
-            const status = (await GasService.getPortStatus()).trim(); 
+            const status = (await FirebaseService.getPortStatus()).trim(); 
             localStorage.setItem("portStatus", status); 
             updatePortToggleUI(status);
         } catch (err) {
@@ -326,24 +326,48 @@ e.preventDefault();
 
 let success = false;
 	  const currentSelectedUser = form.name.value;
+      const newReading = form.reading.value;
+      const prevReading = document.getElementById('prevReading').value;
+      const currentUser = firebase.auth().currentUser;
 	  
+      let gasSuccess = false;
+      let fbSuccess = false;
+
 try {
-        const responseText = await GasService.submitReading(form.name.value, form.reading.value);
-        if (responseText === "Success") {
-            success = true;
-        } else {
-            console.error("GAS вернул ошибку:", responseText);
-            success = false;
-        }
+          // Запускаємо відправку паралельно
+          const [gasRes, fbRes] = await Promise.allSettled([
+              GasService.submitReading(currentSelectedUser, newReading),
+              FirebaseService.saveManualReading(currentUser, currentSelectedUser, prevReading, newReading)
+          ]);
+          
+          if (gasRes.status === 'fulfilled' && gasRes.value === "Success") {
+              gasSuccess = true;
+          } else {
+              console.error("GAS повернув помилку або відмовив:", gasRes.reason || gasRes.value);
+          }
+
+          if (fbRes.status === 'fulfilled' && fbRes.value === true) {
+              fbSuccess = true;
+          } else {
+              console.error("Firestore повернув помилку або відмовив:", fbRes.reason);
+          }
 } catch (err) {
-console.error("Помилка при відправці:", err);
-success = false;
+    console.error("Критична помилка під час відправки:", err);
 } finally {
+        success = gasSuccess || fbSuccess;
         
         // 2. Обновляем статус
         if (success) {
             status.innerText = "✅ Дані успішно відправлені!";
             status.classList.add("success");
+            
+            if (!gasSuccess) {
+                console.warn("Дані збережені лише у Firebase (помилка GAS).");
+            }
+            if (!fbSuccess) {
+                console.warn("Дані збережені лише у GAS (помилка Firebase).");
+            }
+
 			// Отправка аналитики в Гугл
 			if (typeof GoogleAnalytics !== 'undefined') {
             const user = form.name.value;

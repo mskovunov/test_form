@@ -71,6 +71,8 @@ const FirebaseService = (function() {
                 };
 
                 await db.collection('port_logs').add(logData);
+                // Зберігаємо поточний стан в окремий документ для швидкого читання
+                await db.collection('system_state').doc('port_status').set({ status: newStatus, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
                 console.log("[FirebaseService] Лог статусу порта записано успішно.");
 
             } catch (error) {
@@ -79,7 +81,44 @@ const FirebaseService = (function() {
         },
 
         /**
+         * Сохранение введенных пользователем показателей в Firestore
+         * @param {object} user - Текущий авторизованный пользователь
+         * @param {string} username - Имя машины (eGolf и т.д.)
+         * @param {string} prevReading - Предыдущее значение
+         * @param {string} newReading - Новое значение 
+         */
+        saveManualReading: async function(user, username, prevReading, newReading) {
+            if (!user || typeof db === 'undefined') {
+                console.warn("[FirebaseService] Firestore або користувач не ініціалізовані. Логування неможливе.");
+                return false;
+            }
+
+            try {
+                const prev = parseFloat(prevReading);
+                const current = parseFloat(newReading);
+                const diff = current - prev;
+
+                const logData = {
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userId: user.uid,
+                    username: username || user.email,
+                    prevReading: isNaN(prev) ? null : prev,
+                    newReading: isNaN(current) ? null : current,
+                    difference: isNaN(diff) ? null : parseFloat(diff.toFixed(2))
+                };
+
+                await db.collection('manual_meters').add(logData);
+                console.log("[FirebaseService] Показники успішно збережено у Firestore (manual_meters).");
+                return true;
+            } catch (error) {
+                console.error("[FirebaseService] Помилка при записі показників у Firestore:", error);
+                return false;
+            }
+        },
+
+        /**
          * Получение логов портов из Firestore
+
          * @param {number} limitCount
          */
         getPortLogs: async function(limitCount = 200) {
@@ -90,6 +129,76 @@ const FirebaseService = (function() {
             } catch (error) {
                 console.error("[FirebaseService] Помилка завантаження логів:", error);
                 throw error;
+            }
+        },
+
+        getPortStatus: async function() {
+            if (typeof db === 'undefined') return "available";
+            try {
+                const doc = await db.collection('system_state').doc('port_status').get();
+                if (doc.exists) {
+                    return doc.data().status || "available";
+                }
+            } catch (error) {
+                console.error("[FirebaseService] Ошибка при чтении статуса:", error);
+            }
+            return "available";
+        },
+
+        getLastManualReading: async function() {
+            if (typeof db === 'undefined') return null;
+            try {
+                const snapshot = await db.collection('manual_meters').orderBy('timestamp', 'desc').limit(1).get();
+                if (!snapshot.empty) {
+                    return snapshot.docs[0].data().newReading;
+                }
+            } catch (error) {
+                console.error("[FirebaseService] Помилка завантаження ост. показника:", error);
+            }
+            return null;
+        },
+
+        getManualReadingsHistory: async function(monthStr) {
+            if (typeof db === 'undefined') return "[]";
+            try {
+                let query = db.collection('manual_meters').orderBy('timestamp', 'desc');
+                
+                if (monthStr) {
+                    const [year, month] = monthStr.split('-');
+                    const startDate = new Date(year, month - 1, 1);
+                    const endDate = new Date(year, month, 1);
+                    query = query.where('timestamp', '>=', startDate).where('timestamp', '<', endDate);
+                }
+
+                const snapshot = await query.limit(50).get(); 
+                
+                const data = [];
+                snapshot.forEach(doc => {
+                    const row = doc.data();
+                    let dateStr = "---";
+                    if (row.timestamp) {
+                        const date = row.timestamp.toDate();
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const yyyy = date.getFullYear();
+                        const HH = String(date.getHours()).padStart(2, '0');
+                        const MM = String(date.getMinutes()).padStart(2, '0');
+                        dateStr = `${dd}.${mm}.${yyyy} ${HH}:${MM}`;
+                    }
+
+                    data.push({
+                        date: dateStr,
+                        user: row.username || "---",
+                        from: row.prevReading || 0,
+                        to: row.newReading || 0,
+                        diff: row.difference || 0
+                    });
+                });
+                
+                return JSON.stringify(data);
+            } catch (error) {
+                console.error("[FirebaseService] Помилка завантаження історії:", error);
+                return "[]";
             }
         },
 
