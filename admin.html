@@ -70,11 +70,18 @@
 
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center;">
             <h3 style="margin-bottom: 15px;">Керування даними</h3>
-            <button style="width: 100%; max-width: 300px; padding: 12px; font-size: 14px; background-color: var(--secondary-button-bg, #6c757d); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background-color 0.3s;" 
+            
+            <button style="width: 100%; max-width: 300px; padding: 12px; font-size: 14px; background-color: var(--secondary-button-bg, #6c757d); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background-color 0.3s; margin-bottom: 10px;" 
                     onclick="if(confirm('УВАГА: Ви впевнені, що хочете видалити всі існуючі записи показників у Firestore і завантажити їх знову з Google Sheets? Це може зайняти певний час.')) { this.innerHTML = '⏳ Виконується...'; this.disabled = true; migrateAllHistoryToFirestore().then(() => { this.innerHTML = '🔄 Синхронізувати всю історію'; this.disabled = false; }); }">
-                🔄 Синхронізувати всю історію
+                🔄 Синхронізувати історію
             </button>
-            <p style="font-size: 0.75rem; color: #999; margin-top: 8px;">Завантажити попередні показники з GAS у Firestore</p>
+            <p style="font-size: 0.75rem; color: #999; margin-top: 4px; margin-bottom: 20px;">Завантажити всі показники з GAS у Firestore</p>
+            
+            <button style="width: 100%; max-width: 300px; padding: 12px; font-size: 14px; background-color: #17a2b8; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background-color 0.3s;" 
+                    onclick="if(confirm('Синхронізувати налаштування (Config) з GAS в Firestore? Це перепише поточні налаштування БД.')) { this.innerHTML = '⏳ Виконується...'; this.disabled = true; migrateSettingsToFirestore().then(() => { this.innerHTML = '⚙️ Синхронізувати налаштування'; this.disabled = false; }); }">
+                ⚙️ Синхронізувати налаштування
+            </button>
+            <p style="font-size: 0.75rem; color: #999; margin-top: 4px;">Завантажити конфіги email/push з GAS у Firestore</p>
         </div>
 
         <p
@@ -98,6 +105,7 @@
     <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
     <script src="api/migrate-history.js"></script>
+    <script src="api/migrate-settings.js"></script>
 
     <script>
       // Глобальная переменная для отслеживания статуса

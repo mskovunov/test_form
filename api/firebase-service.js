@@ -211,6 +211,89 @@ const FirebaseService = (function() {
             return snapshot.empty ? null : snapshot.docs[0].data().email;
         },
 
+        getAllConfig: async function() {
+            if (typeof db === 'undefined') return "[]";
+            try {
+                const snapshot = await db.collection("notifications_config").get();
+                const results = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    results.push({
+                        user_a: doc.id,
+                        email: data.email || "",
+                        flag: data.notifyEmail ? "1" : "0",
+                        flagP: data.notifyPush ? "1" : "0",
+                        sheetRow: data.sheetRow || null
+                    });
+                });
+                return JSON.stringify(results);
+            } catch (error) {
+                console.error("[FirebaseService] Ошибка при чтении конфига:", error);
+                return "[]";
+            }
+        },
+
+        // Новая функция для миграции данных конфигурации
+        // Предполагается, что эта функция будет вызвана отдельно для выполнения миграции
+        // и не является частью обычного потока getAllConfig.
+        // Если это должно быть частью getAllConfig, то логика должна быть пересмотрена.
+        // В текущем виде, это отдельная асинхронная операция.
+        migrateConfigData: async function(data) {
+            if (typeof db === 'undefined') {
+                console.warn("[FirebaseService] Firestore не ініціалізовано. Міграція неможлива.");
+                return 0;
+            }
+            let successCount = 0;
+            for (const [index, row] of data.entries()) {
+                const username = row.user_a;
+                if (!username) continue;
+
+                const logData = {
+                    email: row.email || "",
+                    notifyEmail: row.flag === "1",
+                    notifyPush: row.flagP === "1",
+                    sheetRow: index + 2, // Предполагается, что данные начинаются со 2-й строки в таблице
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                try {
+                    await db.collection("notifications_config").doc(username).set(logData, { merge: true });
+                    successCount++;
+                } catch (error) {
+                    console.error(`[FirebaseService] Ошибка при миграции конфига для ${username}:`, error);
+                }
+            }
+            console.log(`[FirebaseService] Міграція завершена. Успішно оновлено ${successCount} записів.`);
+            return successCount;
+        },
+
+        updateConfigEmail: async function(username, newEmail) {
+            if (typeof db === 'undefined' || !username) return false;
+            try {
+                await db.collection("notifications_config").doc(username).set(
+                    { email: newEmail, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, 
+                    { merge: true }
+                );
+                return true;
+            } catch (error) {
+                console.error("[FirebaseService] Ошибка записи email:", error);
+                return false;
+            }
+        },
+
+        updateConfigFlags: async function(username, flagType, flagValue) {
+            if (typeof db === 'undefined' || !username) return false;
+            try {
+                const updateObj = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                updateObj[flagType] = flagValue;
+                await db.collection("notifications_config").doc(username).set(updateObj, { merge: true });
+                return true;
+            } catch (error) {
+                console.error("[FirebaseService] Ошибка записи флага:", error);
+                return false;
+            }
+        },
+
         checkUsernameUnique: async function(username) {
             if (typeof db === 'undefined') return false;
             const searchUsername = username.toLowerCase();

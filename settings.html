@@ -213,25 +213,28 @@
         }
 
         try {
+          // 1. Оновлення в Firebase
+          const username = inputElement.closest('tr').cells[0].innerText;
+          const firebaseUpdate = FirebaseService.updateConfigEmail(username, newEmail);
+
+          // 2. Оновлення в GAS (для синхронізації)
           const formData = new FormData();
           formData.append("updateConfig", "1");
-          // ГАРАНТИРУЕМ, что row передается как строка
           formData.append("row", String(sheetRow));
           formData.append("email", newEmail);
-          // ГАРАНТИРУЕМ, что column передается как строка
-          formData.append("column", "4"); // Колонка D (Email) имеет индекс 4 (A=1, B=2, C=3, D=4)
+          formData.append("column", "4");
+          const gasUpdate = GasService.updateConfig(formData);
 
-          const responseText = await GasService.updateConfig(formData);
+          // Чекаємо на обидва оновлення
+          const [fbRes, gasRes] = await Promise.all([firebaseUpdate, gasUpdate]);
 
-          if (responseText.includes("Success")) {
+          if (fbRes && gasRes.includes("Success")) {
             statusDiv.innerHTML = `✅ Email оновлено успішно на: ${newEmail}`;
             inputElement.style.border = "2px solid var(--status-success)";
-            inputElement.dataset.originalEmail = newEmail; // Обновляем оригинал
-
-            await loadConfig();
+            inputElement.dataset.originalEmail = newEmail;
+            // Не викликаємо loadConfig() тут, щоб не пересмикувати фокус
           } else {
-            // Если ошибка от GAS, она будет отображена.
-            throw new Error(responseText);
+            throw new Error(gasRes || "Помилка оновлення одного з сервісів");
           }
         } catch (err) {
           // Обработка ошибки, включая ошибку 'Invalid input parameters' от GAS
@@ -295,21 +298,28 @@
         }
 
         try {
+          const username = indicator.closest('tr').cells[0].innerText;
+          const flagKey = targetColumn === 5 ? "notifyEmail" : "notifyPush";
+          const flagValue = newStatus === "1";
+
+          // 1. Оновлення в Firebase
+          const firebaseUpdate = FirebaseService.updateConfigFlags(username, flagKey, flagValue);
+
+          // 2. Оновлення в GAS
           const formData = new FormData();
           formData.append("updateConfig", "1");
           formData.append("row", sheetRow);
           formData.append("status", newStatus);
           formData.append("column", targetColumn);
+          const gasUpdate = GasService.updateConfig(formData);
 
-          const responseText = await GasService.updateConfig(formData);
+          const [fbRes, gasRes] = await Promise.all([firebaseUpdate, gasUpdate]);
 
-          if (responseText.includes("Success")) {
-            // Выводим успех
+          if (fbRes && gasRes.includes("Success")) {
             statusDiv.innerHTML = "✅ Статус оновлено успішно.";
-            // Перезагружаем данные
             await loadConfig();
           } else {
-            throw new Error(responseText);
+            throw new Error(gasRes || "Помилка оновлення сервісів");
           }
         } catch (err) {
           statusDiv.innerHTML = `<p style="color: var(--status-error);">⚠️ Помилка оновлення: ${
@@ -410,11 +420,18 @@
         }
 
         try {
-          // Запрос к GAS для получения данных в формате JSON
-          const dataText = await GasService.getConfig();
+          // Запит до Firebase (тепер основне джерело)
+          const dataText = await FirebaseService.getAllConfig();
           const data = JSON.parse(dataText);
 
-          appData = data; // Сохраняем данные глобально
+          appData = data; 
+
+          if (!appData || appData.length === 0) {
+            // Фолбек на GAS, якщо в Firebase порожньо (наприклад, до міграції)
+            console.log("ℹ️ Firebase порожній, пробуємо GAS...");
+            const gasText = await GasService.getConfig();
+            appData = JSON.parse(gasText);
+          }
 
           if (!appData || appData.length === 0) {
             configDiv.innerHTML =
@@ -488,8 +505,8 @@
         data.forEach((row, index) => {
           const isEmailActive = row.flag === "1";
           const isPushActive = row.flagP === "1";
-          // Номер строки в Google Sheet: index + 2 (т.к. читаем с A2)
-          const sheetRow = index + 2;
+          // Номер строки берем из БД
+          const sheetRow = row.sheetRow || (index + 2);
 
           // Элементы для Email (Колонка E)
           const emailIcon = isEmailActive ? "🟢" : "🔴";
