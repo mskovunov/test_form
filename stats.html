@@ -83,15 +83,18 @@
       </div>
     </div>
 
+    <script src="config.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="./firebase-init.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
 
     <script>
       // Проверка статуса авторизации при загрузке страницы
-      auth.onAuthStateChanged((user) => {
+      auth.onAuthStateChanged(async (user) => {
         if (!user) {
           // Если пользователь НЕ авторизован
           console.log(
@@ -102,7 +105,7 @@
         } else {
           // Пользователь авторизован
           console.log("Пользователь авторизован как:", user.email);
-          // Здесь можно выполнять код для авторизованных пользователей (например, загрузку данных из Firestore)
+          await loadUserUI(user);
         }
       });
 

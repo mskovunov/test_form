@@ -204,7 +204,7 @@
 
     <script>
       // Проверка статуса авторизации при загрузке страницы
-      auth.onAuthStateChanged((user) => {
+      auth.onAuthStateChanged(async (user) => {
         if (!user) {
           // Если пользователь НЕ авторизован
           console.log(
@@ -215,7 +215,7 @@
         } else {
           // Пользователь авторизован
           console.log("Пользователь авторизован как:", user.email);
-          // Здесь можно выполнять код для авторизованных пользователей (например, загрузку данных из Firestore)
+          await loadUserUI(user);
         }
       });
 

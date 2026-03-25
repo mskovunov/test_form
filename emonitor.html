@@ -225,6 +225,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="./firebase-init.js"></script>
+    <script src="api/gas-service.js"></script>
+    <script src="api/firebase-service.js"></script>
     <script src="utils.js"></script>
 
     <script>
@@ -756,18 +758,12 @@
       });
 
       async function checkAdminStatus(user) {
-        const userRef = db.collection("users").doc(user.uid);
         try {
-          const doc = await userRef.get();
-          if (doc.exists && doc.data().role === "admin") {
+          const data = await loadUserUI(user);
+          if (data && data.role === "admin") {
             isAdmin = true;
             document.getElementById("monitoring-section").style.display =
               "block";
-            const username = doc.data().username || user.email;
-            document.getElementById("user-email-display").textContent =
-              username;
-            const adminMenuItem = document.getElementById("admin-menu-item");
-            if (adminMenuItem) adminMenuItem.style.display = "block";
             initPowerMonitor();
             initLogs();
             // Запускаем получение данных сразу при загрузке

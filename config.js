@@ -5,6 +5,6 @@ const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxz7-m_sG1HJumY3UYlO
 //const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwVyyh51sypiCvYZrnVRmqL3spiA4lCkdO9w1EtwpYYIdq-Hu6IUwBRtVGqbZfSgBmO/exec';    // meter_form - DEV
 
 // Номер версии сборки
-const BUILD_VERSION = 'v2026.03.18.2359'
+const BUILD_VERSION = 'v2026.03.25.1759'
 
 

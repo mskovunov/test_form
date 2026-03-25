@@ -101,7 +101,7 @@
         }
 
         try {
-          const data = await FirebaseService.getUserData(user);
+          const data = await loadUserUI(user);
 
           if (data && data.role === "admin") {
             isAdmin = true;

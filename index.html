@@ -369,33 +369,6 @@ success = false;
  });
 
 		
-		// --- НОВАЯ ФУНКЦИЯ: Загрузка Username из Firestore ---
-		async function loadUsername(user) {
-            if (!user) return;
-            const displayElement = document.getElementById('user-email-display');
-			const adminMenuItem = document.getElementById('admin-menu-item'); 
-			
-			// Скрываем меню по умолчанию
-			if (adminMenuItem) {
-				adminMenuItem.style.display = 'none';
-			}
-            
-            const data = await FirebaseService.getUserData(user);
-            if (data) {
-                // 1. Отображение Username
-                if (data.username) {
-                    currentUsername = data.username; 
-                    displayElement.textContent = data.username;
-                    setFormUser(currentUsername); 
-                }
-                
-                // 2. Проверка и отображение меню администратора
-                if (adminMenuItem && data.role === 'admin') {
-                    adminMenuItem.style.display = 'list-item';
-                }
-            }
-	}
-	
 	function setFormUser(username) {
     const select = document.querySelector('select[name="name"]');
     if (!select || !username) return;
@@ -433,7 +406,7 @@ success = false;
 	
 	<script>
 	// Проверка статуса авторизации при загрузке страницы
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
         if (!user) {
             // Если пользователь НЕ авторизован
             console.log("Пользователь не авторизован. Перенаправление на страницу входа.");
@@ -441,10 +414,14 @@ success = false;
             window.location.replace('auth.html'); 
         } else {
             // Пользователь авторизован
-            console.log("Пользователь авторизован как:", user.email);
+            console.log("Пользователь авторизован як:", user.email);
             
-            // НОВОЕ: Загрузка и отображение username
-            loadUsername(user);
+            // НОВОЕ: Загрузка и отображение username через спільно використовувану функцію
+            const data = await loadUserUI(user);
+            if (data && data.username) {
+                currentUsername = data.username;
+                setFormUser(currentUsername);
+            }
         }
     });
 
